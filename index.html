@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#071412" />
+    <meta name="description" content="Guide a brave spark through a moonlit garden and survive until dawn." />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <title>Lumenwake</title>
+  </head>
+  <body data-mode="loading" data-danger="false">
+    <main id="app">
+      <canvas id="game-canvas" aria-label="Lumenwake survival arena" tabindex="0"></canvas>
+      <div class="world-frame" aria-hidden="true"></div>
+      <div id="danger-vignette" aria-hidden="true"></div>
+
+      <header id="hud" aria-label="Run status" hidden>
+        <section class="health-readout" aria-label="Health">
+          <div class="health-copy"><span>SPARK</span><strong id="health-text">100 / 100</strong></div>
+          <div class="health-track"><span id="health-fill"></span></div>
+        </section>
+
+        <section class="time-readout" aria-label="Time remaining">
+          <span id="dawn-label">DAWN IN</span>
+          <strong id="time-text">05:00</strong>
+        </section>
+
+        <div class="hud-actions">
+          <section class="level-readout" aria-label="Level"><span>LV</span><strong id="level-text">1</strong></section>
+          <button id="pause-button" class="icon-button" type="button" aria-label="Pause run">
+            <span class="pause-mark" aria-hidden="true"><i></i><i></i></span>
+          </button>
+        </div>
+      </header>
+
+      <div id="xp-readout" aria-label="Experience" hidden>
+        <div class="xp-copy"><span id="xp-label">GROWTH 0%</span><strong id="xp-level-text">LV 1</strong></div>
+        <div class="xp-track"><span id="xp-fill"></span></div>
+      </div>
+
+      <div id="joystick" aria-label="Touch movement control" hidden>
+        <span class="joystick-ring"></span>
+        <span id="joystick-knob"></span>
+        <small>MOVE</small>
+      </div>
+
+      <div id="toast" role="status" aria-live="polite" hidden></div>
+
+      <section id="loading-screen" class="overlay is-visible" aria-label="Loading Lumenwake">
+        <div class="loading-mark" aria-hidden="true"><span></span><span></span></div>
+        <p>Waking the garden</p>
+      </section>
+
+      <section id="start-screen" class="overlay" aria-labelledby="game-title" hidden>
+        <div class="start-panel">
+          <div class="eyebrow"><span></span> MOONLIT GARDEN · RUN 01</div>
+          <h1 id="game-title"><span>Lumen</span>wake</h1>
+          <p class="start-lede">Carry the last spark through five minutes of hungry dark.</p>
+
+          <div class="tutorial-grid" aria-label="How to play">
+            <div><span class="tutorial-index">01</span><p><strong>Move</strong><small>WASD, arrows, or drag</small></p></div>
+            <div><span class="tutorial-index">02</span><p><strong>Trust your glow</strong><small>Attacks fire on their own</small></p></div>
+            <div><span class="tutorial-index">03</span><p><strong>Grow strange</strong><small>Collect light, choose a boon</small></p></div>
+          </div>
+
+          <div class="start-actions">
+            <button id="start-button" class="primary-button" type="button">Enter the garden <span aria-hidden="true">→</span></button>
+            <button id="install-button" class="secondary-button" type="button">Install game</button>
+          </div>
+          <p id="install-status" class="install-status" role="status"></p>
+          <div class="run-note"><span></span> Survive until dawn to win</div>
+        </div>
+      </section>
+
+      <section id="pause-screen" class="overlay compact-overlay" aria-labelledby="pause-title" hidden>
+        <div class="modal-panel">
+          <div class="eyebrow"><span></span> THE GARDEN HOLDS</div>
+          <h2 id="pause-title">Run paused</h2>
+          <p>Your enemies are waiting exactly where you left them.</p>
+          <div class="modal-stats">
+            <div><span>TIME</span><strong id="pause-time">00:00</strong></div>
+            <div><span>LEVEL</span><strong id="pause-level">1</strong></div>
+            <div><span>CLEARS</span><strong id="pause-kills">0</strong></div>
+          </div>
+          <div class="modal-actions">
+            <button id="resume-button" class="primary-button" type="button">Return to the dark</button>
+            <button id="pause-restart-button" class="secondary-button" type="button">Restart run</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="upgrade-screen" class="overlay upgrade-overlay" aria-labelledby="upgrade-title" hidden>
+        <div class="upgrade-header">
+          <div class="eyebrow"><span></span> THE LIGHT CHANGES</div>
+          <h2 id="upgrade-title">Choose one mutation</h2>
+          <p id="upgrade-level">Level 2 reached</p>
+        </div>
+        <div id="upgrade-options" class="upgrade-options" role="group" aria-label="Upgrade choices"></div>
+        <p class="choice-hint">Tap a boon to return to the garden</p>
+      </section>
+
+      <section id="end-screen" class="overlay compact-overlay" aria-labelledby="end-title" hidden>
+        <div class="modal-panel end-panel">
+          <div id="end-eyebrow" class="eyebrow"><span></span> THE GARDEN ANSWERS</div>
+          <h2 id="end-title">Dawn secured</h2>
+          <p id="end-message">The last spark held until sunrise.</p>
+          <div class="modal-stats">
+            <div><span>TIME</span><strong id="end-time">05:00</strong></div>
+            <div><span>LEVEL</span><strong id="end-level">1</strong></div>
+            <div><span>CLEARS</span><strong id="end-kills">0</strong></div>
+          </div>
+          <button id="restart-button" class="primary-button" type="button">Run it again <span aria-hidden="true">↻</span></button>
+        </div>
+      </section>
+
+      <section id="fatal-screen" class="overlay compact-overlay" aria-labelledby="fatal-title" hidden>
+        <div class="modal-panel">
+          <div class="eyebrow"><span></span> THE GARDEN FALTERED</div>
+          <h2 id="fatal-title">Lumenwake could not start</h2>
+          <p id="fatal-message">Reload the page to try again.</p>
+          <button id="reload-button" class="primary-button reload-button" type="button">Reload game</button>
+        </div>
+      </section>
+    </main>
+    <noscript><p style="color:#f1f4d8;background:#071412;padding:2rem;font:600 1rem system-ui">Lumenwake needs JavaScript to run.</p></noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
