@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { sound } from './audio';
 import { gameAssetNames } from './assets';
 import { applyUpgrade, baseStats, experienceNeeded, getUpgrade, upgrades, type Stats, type UpgradeId } from './upgrades';
 import { decorations, obstacles } from './world';
@@ -37,6 +38,7 @@ class ArenaScene extends Phaser.Scene {
   private nextEntityId = 1;
   private facing = 0;
   private attackTimer = 0;
+  private footstepTimer = 0;
   private spawnTimer = 0.4;
   private projectileCooldown = 0;
   private pulseCooldown = 0;
@@ -103,6 +105,7 @@ class ArenaScene extends Phaser.Scene {
     this.scene.resume();
     this.callbacks.onMode(this.mode);
     this.emitHud();
+    sound.play('start');
     this.callbacks.onToast('The garden wakes');
   }
 
@@ -112,6 +115,7 @@ class ArenaScene extends Phaser.Scene {
     this.setInput(0, 0);
     this.scene.pause();
     this.callbacks.onMode(this.mode);
+    sound.play('pause');
     this.emitHud();
   }
 
@@ -120,6 +124,7 @@ class ArenaScene extends Phaser.Scene {
     this.mode = 'running';
     this.scene.resume();
     this.callbacks.onMode(this.mode);
+    sound.play('resume');
   }
 
   setInput(x: number, y: number): void {
@@ -145,6 +150,7 @@ class ArenaScene extends Phaser.Scene {
     applyUpgrade(this.stats, id);
     this.upgradeRanks.set(id, (this.upgradeRanks.get(id) ?? 0) + 1);
     if (id === 'vigor') this.player.setData('health', Math.min(this.stats.maxHealth, this.getHealth() + 30));
+    sound.play('ui');
     this.pendingLevels = Math.max(0, this.pendingLevels - 1);
     if (this.pendingLevels > 0) {
       this.openUpgrade();
@@ -205,6 +211,7 @@ class ArenaScene extends Phaser.Scene {
     this.stats = { ...baseStats };
     this.upgradeRanks.clear();
     this.spawnTimer = 0.4;
+    this.footstepTimer = 0;
     this.projectileCooldown = 0;
     this.pulseCooldown = 0;
     this.nextSurge = this.qaMode ? 10 : 60;
@@ -327,7 +334,12 @@ class ArenaScene extends Phaser.Scene {
     const invulnerable = Math.max(0, Number(this.player.getData('invulnerable')) - delta);
     this.player.setData('invulnerable', invulnerable);
     this.attackTimer = Math.max(0, this.attackTimer - delta);
+    this.footstepTimer = Math.max(0, this.footstepTimer - delta);
     const speed = Math.hypot(body.velocity.x, body.velocity.y);
+    if (speed > 32 && this.footstepTimer <= 0) {
+      sound.play('walk');
+      this.footstepTimer = this.qaMode ? 0.18 : 0.34;
+    }
     if (speed > 32) {
       const targetFacing = Math.atan2(body.velocity.y, body.velocity.x);
       const difference = Math.atan2(Math.sin(targetFacing - this.facing), Math.cos(targetFacing - this.facing));
@@ -495,6 +507,7 @@ class ArenaScene extends Phaser.Scene {
     }
     this.attackTimer = 0.18;
     this.projectileCooldown = this.stats.projectileRate;
+    sound.play('shoot');
   }
 
   private firePulse(): void {
@@ -506,6 +519,7 @@ class ArenaScene extends Phaser.Scene {
       if (distance <= this.stats.pulseRange) this.damageEnemy(enemy, this.stats.pulseDamage);
     }
     this.pulseCooldown = this.stats.pulseRate;
+    sound.play('pulse');
   }
 
   private updateProjectiles(delta: number): void {
@@ -535,9 +549,11 @@ class ArenaScene extends Phaser.Scene {
     this.time.delayedCall(90, () => enemy.setTint(0xffffff));
     this.spawnImpact(enemy.x, enemy.y, enemy.getData('kind') === 'shell' ? 62 : 44);
     this.spawnDamageText(enemy.x, enemy.y, damage, '#fff8d7');
+    sound.play('hit');
     if (health > 0) return;
     enemy.destroy();
     this.kills += 1;
+    sound.play('kill');
     const dropCount = enemy.getData('kind') === 'shell' ? 2 : 1;
     for (let index = 0; index < dropCount; index += 1) this.spawnXp(enemy.x, enemy.y, Number(enemy.getData('xp')) / dropCount);
   }
@@ -553,12 +569,14 @@ class ArenaScene extends Phaser.Scene {
     body.velocity.add(direction);
     this.spawnImpact(this.player.x, this.player.y, 48, '#ff4d69');
     this.spawnDamageText(this.player.x, this.player.y - 24, amount, '#ff6b7d');
+    sound.play('hurt');
     this.cameras.main.shake(90, 0.004);
     if (health <= 0) this.finish(false);
   }
 
   private collectXp(drop: Phaser.Physics.Arcade.Image): void {
     drop.destroy();
+    sound.play('xp');
     this.xp += 1 * this.xpScale;
     while (this.xp >= this.xpNeeded) {
       this.xp -= this.xpNeeded;
@@ -652,6 +670,7 @@ class ArenaScene extends Phaser.Scene {
     this.callbacks.onUpgrade(available.slice(0, 3), this.level);
     this.callbacks.onMode(this.mode);
     this.callbacks.onToast('Choose one mutation');
+    sound.play('upgrade');
     this.scene.pause();
   }
 
@@ -661,6 +680,7 @@ class ArenaScene extends Phaser.Scene {
     this.setInput(0, 0);
     this.scene.pause();
     this.callbacks.onMode(this.mode);
+    sound.play(victory ? 'victory' : 'defeat');
     this.callbacks.onEnd(victory, this.getHud());
     this.callbacks.onDanger(false);
   }

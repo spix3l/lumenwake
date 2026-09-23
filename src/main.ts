@@ -1,4 +1,5 @@
 import './style.css';
+import { sound } from './audio';
 import { PhaserGame } from './phaser-game';
 import type { GameMode, GameSnapshot, HudState } from './game';
 import type { Upgrade, UpgradeId } from './upgrades';
@@ -46,6 +47,8 @@ const joystickKnob = element<HTMLElement>('joystick-knob');
 const toast = element<HTMLElement>('toast');
 const startButton = element<HTMLButtonElement>('start-button');
 const installButton = element<HTMLButtonElement>('install-button');
+const soundToggle = element<HTMLButtonElement>('sound-toggle');
+const soundLabel = element<HTMLElement>('sound-label');
 const installStatus = element<HTMLElement>('install-status');
 const pauseButton = element<HTMLButtonElement>('pause-button');
 const resumeButton = element<HTMLButtonElement>('resume-button');
@@ -86,6 +89,12 @@ function showScreen(screen: HTMLElement, visible: boolean): void {
 function setMode(mode: GameMode): void {
   currentMode = mode;
   body.dataset.mode = mode;
+  if (mode === 'ready' || mode === 'victory') sound.setMusic('menu');
+  else if (mode === 'gameover') sound.setMusic('ambient');
+  else {
+    sound.setMusic('gameplay');
+    if (mode === 'paused' || mode === 'upgrade') sound.pauseMusic();
+  }
   showScreen(loadingScreen, false);
   showScreen(startScreen, mode === 'ready');
   showScreen(pauseScreen, mode === 'paused');
@@ -125,6 +134,12 @@ function showToast(message: string): void {
       if (!toast.classList.contains('is-visible')) toast.hidden = true;
     }, 180);
   }, 1700);
+}
+
+function updateSoundToggle(): void {
+  const muted = sound.isMuted();
+  soundToggle.setAttribute('aria-pressed', String(!muted));
+  soundLabel.textContent = muted ? 'Sound: off' : 'Sound: on';
 }
 
 function renderUpgradeChoices(choices: Upgrade[], level: number): void {
@@ -253,6 +268,7 @@ window.addEventListener('keydown', (event) => {
     if (choice) game.chooseUpgrade(choice.id);
   }
   if (currentMode === 'ready' && event.code === 'Enter' && document.activeElement === canvas) {
+    sound.unlock();
     game.start();
   }
 });
@@ -266,11 +282,22 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) game.pause();
 });
 
-startButton.addEventListener('click', () => game.start());
+startButton.addEventListener('click', () => {
+  sound.unlock();
+  game.start();
+});
 pauseButton.addEventListener('click', () => game.pause());
 resumeButton.addEventListener('click', () => game.resume());
 pauseRestartButton.addEventListener('click', () => game.restart());
 restartButton.addEventListener('click', () => game.restart());
+soundToggle.addEventListener('click', () => {
+  const muted = sound.toggleMuted();
+  updateSoundToggle();
+  if (!muted) {
+    sound.unlock();
+    sound.play('ui');
+  }
+});
 element<HTMLButtonElement>('reload-button').addEventListener('click', () => window.location.reload());
 
 upgradeOptions.addEventListener('click', (event) => {
@@ -287,6 +314,8 @@ window.addEventListener('beforeinstallprompt', (event) => {
 });
 
 installButton.addEventListener('click', async () => {
+  sound.unlock();
+  sound.play('ui');
   if (!deferredInstall) {
     installStatus.textContent = 'Use your browser menu, then choose Add to Home Screen or Install app.';
     return;
@@ -302,6 +331,7 @@ installButton.addEventListener('click', async () => {
 const resizeObserver = new ResizeObserver(() => game.resize());
 resizeObserver.observe(canvas);
 game.resize();
+updateSoundToggle();
 setMode('ready');
 
 if (game.snapshot().qa) {

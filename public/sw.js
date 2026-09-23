@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lumenwake-shell-v9';
+const CACHE_NAME = 'lumenwake-shell-v10';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -40,6 +40,23 @@ const CORE_ASSETS = [
   './assets/game/building-fence.png',
   './assets/game/building-well.png',
   './assets/game/building-shrine.png',
+  './assets/audio/forest-orchestra.ogg',
+  './assets/audio/forest-stage.ogg',
+  './assets/audio/forest-ambient.ogg',
+  './assets/audio/effects/ui-click.ogg',
+  './assets/audio/effects/start-bell.ogg',
+  './assets/audio/effects/pause-click.ogg',
+  './assets/audio/effects/resume-spring.ogg',
+  './assets/audio/effects/walk-step.ogg',
+  './assets/audio/effects/shoot.ogg',
+  './assets/audio/effects/pulse-spell.ogg',
+  './assets/audio/effects/hit.ogg',
+  './assets/audio/effects/hurt.ogg',
+  './assets/audio/effects/kill.ogg',
+  './assets/audio/effects/xp-coin.ogg',
+  './assets/audio/effects/upgrade-gem.ogg',
+  './assets/audio/effects/victory-bell.ogg',
+  './assets/audio/effects/defeat-impact.ogg',
 ];
 
 async function cacheAppShell() {

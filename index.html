@@ -56,7 +56,7 @@
         <p>Waking the garden</p>
       </section>
 
-      <section id="start-screen" class="overlay" aria-labelledby="game-title" hidden>
+      <section id="start-screen" class="overlay" aria-labelledby="game-title" aria-label="Lumenwake main menu" hidden>
         <div class="start-panel">
           <div class="eyebrow"><span></span> MOONLIT GARDEN · RUN 01</div>
           <h1 id="game-title"><span>Lumen</span>wake</h1>
@@ -71,6 +71,13 @@
           <div class="start-actions">
             <button id="start-button" class="primary-button" type="button">Enter the garden <span aria-hidden="true">→</span></button>
             <button id="install-button" class="secondary-button" type="button">Install game</button>
+          </div>
+          <div class="menu-options">
+            <button id="sound-toggle" class="menu-option" type="button" aria-pressed="true">
+              <span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+              <span id="sound-label">Sound: on</span>
+            </button>
+            <span class="menu-hint">Press Enter to begin</span>
           </div>
           <p id="install-status" class="install-status" role="status"></p>
           <div class="run-note"><span></span> Survive until dawn to win</div>

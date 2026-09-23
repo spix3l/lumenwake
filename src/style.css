@@ -652,6 +652,96 @@ h1 span {
   min-width: 140px;
 }
 
+.menu-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.menu-option {
+  min-height: 46px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(101, 244, 219, 0.28);
+  background: rgba(16, 42, 37, 0.72);
+  color: var(--paper);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: transform 100ms ease-out, background-color 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out;
+}
+
+.menu-option:hover,
+.menu-option:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--spark);
+  background: var(--moss-light);
+  color: var(--spark);
+}
+
+.menu-option:active {
+  transform: translateY(1px) scale(0.985);
+}
+
+.sound-bars {
+  width: 17px;
+  height: 16px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.sound-bars i {
+  display: block;
+  width: 3px;
+  background: currentColor;
+  transition: height 140ms ease-out, opacity 140ms ease-out;
+}
+
+.sound-bars i:nth-child(1) {
+  height: 7px;
+}
+
+.sound-bars i:nth-child(2) {
+  height: 13px;
+}
+
+.sound-bars i:nth-child(3) {
+  height: 10px;
+}
+
+.menu-option[aria-pressed="false"] {
+  color: var(--muted);
+}
+
+.menu-option[aria-pressed="false"] .sound-bars i:nth-child(1) {
+  height: 3px;
+  opacity: 0.45;
+}
+
+.menu-option[aria-pressed="false"] .sound-bars i:nth-child(2) {
+  height: 5px;
+  opacity: 0.45;
+}
+
+.menu-option[aria-pressed="false"] .sound-bars i:nth-child(3) {
+  height: 3px;
+  opacity: 0.45;
+}
+
+.menu-hint {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
 .install-status {
   min-height: 1.1em;
   margin: 9px 0 0;
@@ -1106,6 +1196,20 @@ h1 span {
   .start-panel {
     padding-right: 18px;
     padding-left: 18px;
+  }
+
+  .menu-options {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .menu-option {
+    justify-content: center;
+  }
+
+  .menu-hint {
+    text-align: center;
   }
 
   .start-lede {
