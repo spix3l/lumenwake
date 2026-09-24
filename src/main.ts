@@ -78,6 +78,7 @@ const endEyebrow = element<HTMLElement>('end-eyebrow');
 const endTime = element<HTMLElement>('end-time');
 const endLevel = element<HTMLElement>('end-level');
 const endKills = element<HTMLElement>('end-kills');
+const endMenuButton = element<HTMLButtonElement>('end-menu-button');
 const levelOptions = element<HTMLDivElement>('level-options');
 const levelTitle = element<HTMLElement>('level-picker-title');
 const levelDescription = element<HTMLElement>('level-description');
@@ -397,6 +398,13 @@ pauseRestartButton.addEventListener('click', () => {
 restartButton.addEventListener('click', () => {
   lastStage = -1;
   game.restart(selectedLevelId);
+});
+endMenuButton.addEventListener('click', () => {
+  lastStage = -1;
+  stageBanner.hidden = true;
+  stageBanner.classList.remove('is-visible');
+  resetJoystick();
+  game.returnToMenu();
 });
 pauseMenuButton.addEventListener('click', () => {
   lastStage = -1;
