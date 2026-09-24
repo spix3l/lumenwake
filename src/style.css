@@ -282,6 +282,23 @@ body[data-low-health="true"] .health-track span {
   background: currentColor;
 }
 
+#perk-status {
+  position: absolute;
+  z-index: 12;
+  top: calc(var(--safe-top) + 70px);
+  right: var(--safe-right);
+  max-width: calc(100vw - 32px);
+  padding: 7px 10px;
+  border: 1px solid rgba(101, 244, 219, 0.34);
+  background: rgba(7, 20, 18, 0.86);
+  color: var(--aqua);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
 #xp-readout {
   position: absolute;
   z-index: 10;
@@ -544,6 +561,103 @@ body:not([data-mode="running"]) #joystick {
   width: 3px;
   height: 88px;
   background: var(--spark);
+}
+
+.level-picker {
+  margin-bottom: 22px;
+  padding: 15px 0 18px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.level-picker-copy h2 {
+  margin: 9px 0 5px;
+  color: var(--paper);
+  font-size: 1.3rem;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+.level-picker-copy p {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.level-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.level-option {
+  min-height: 92px;
+  padding: 12px;
+  border: 1px solid rgba(101, 244, 219, 0.24);
+  background: rgba(16, 42, 37, 0.72);
+  color: var(--paper);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease-out, border-color 120ms ease-out, background-color 120ms ease-out;
+}
+
+.level-option:hover,
+.level-option:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--spark);
+}
+
+.level-option.is-selected {
+  border-color: var(--spark);
+  background: rgba(31, 66, 53, 0.94);
+  box-shadow: inset 3px 0 0 var(--spark);
+}
+
+.level-option strong,
+.level-option span,
+.level-option small {
+  display: block;
+}
+
+.level-option strong {
+  margin-bottom: 8px;
+  color: var(--spark);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.level-option span {
+  color: var(--paper);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.level-option small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.support-link {
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--aqua);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.support-link:hover,
+.support-link:focus-visible {
+  color: var(--spark);
 }
 
 .eyebrow {
@@ -845,6 +959,68 @@ h1 span {
   margin-bottom: 26px;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.settings-channel {
+  padding: 15px;
+  border: 1px solid var(--line);
+  background: rgba(16, 42, 37, 0.62);
+}
+
+.settings-channel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.settings-channel h3 {
+  margin: 0;
+  color: var(--paper);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.settings-channel-head span {
+  color: var(--spark);
+  font-size: 0.64rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.settings-channel .menu-option {
+  width: 100%;
+  justify-content: flex-start;
+  margin-bottom: 13px;
+}
+
+.volume-control {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.volume-control output {
+  color: var(--spark);
+}
+
+.settings-channel input[type="range"] {
+  width: 100%;
+  accent-color: var(--spark);
+  cursor: pointer;
 }
 
 .modal-stats {
@@ -1149,6 +1325,22 @@ h1 span {
 
   .start-actions .secondary-button {
     min-height: 46px;
+  }
+
+  .level-options {
+    grid-template-columns: 1fr;
+  }
+
+  .level-option {
+    min-height: 74px;
+  }
+
+  .menu-options {
+    flex-wrap: wrap;
+  }
+
+  .menu-hint {
+    margin-left: auto;
   }
 
   .run-note {

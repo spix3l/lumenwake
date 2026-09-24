@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { sound } from './audio';
 import { gameAssetNames } from './assets';
 import { applyUpgrade, baseStats, experienceNeeded, getUpgrade, upgrades, type Stats, type UpgradeId } from './upgrades';
+import { perkDefinitions, type PerkKind } from './perks';
+import { DEFAULT_LEVEL_ID, getLevel, type LevelDefinition, type LevelId } from './levels';
 import { decorations, obstacles } from './world';
 import type { GameCallbacks, GameMode, GameSnapshot, HudState } from './game';
 
@@ -12,20 +14,12 @@ interface Bridge {
 
 const START_CENTER = 770;
 const TAU = Math.PI * 2;
-const STAGE_DURATION = 60;
-const STAGES = [
-  { name: 'Rootway', description: 'The garden opens its eyes.' },
-  { name: 'Moonwell', description: 'The water remembers your name.' },
-  { name: 'Briarwind', description: 'The hedges begin to lean in.' },
-  { name: 'Hollow Crown', description: 'Something old wakes beneath the roots.' },
-  { name: 'Dawn Edge', description: 'Hold the light until sunrise.' },
-] as const;
 
-function stageAt(index: number) {
-  return STAGES[index] ?? STAGES[0]!;
+function stageAt(level: LevelDefinition, index: number) {
+  return level.stages[index] ?? level.stages[0]!;
 }
 
-type EnemyKind = 'gnaw' | 'shell';
+type EnemyKind = 'gnaw' | 'shell' | 'spitter';
 type EnemyState = 'pursue' | 'windup' | 'charge' | 'recover';
 type DirectionalFrame = 0 | 1 | 2 | 3 | 4;
 
@@ -35,7 +29,7 @@ class ArenaScene extends Phaser.Scene {
   private callbacks!: GameCallbacks;
   private mode: GameMode = 'ready';
   private qaMode = false;
-  private runDuration = 300;
+  private runDuration = 600;
   private timeScale = 1;
   private xpScale = 1;
   private inputX = 0;
@@ -44,10 +38,13 @@ class ArenaScene extends Phaser.Scene {
   private elapsed = 0;
   private stage = 0;
   private level = 1;
+  private levelDefinition = getLevel(DEFAULT_LEVEL_ID);
+  private levelId: LevelId = DEFAULT_LEVEL_ID;
   private xp = 0;
   private xpNeeded = experienceNeeded(1);
   private pendingLevels = 0;
   private kills = 0;
+  private spitterSpawns = 0;
   private nextEntityId = 1;
   private facing = 0;
   private attackTimer = 0;
@@ -55,6 +52,12 @@ class ArenaScene extends Phaser.Scene {
   private spawnTimer = 0.4;
   private projectileCooldown = 0;
   private pulseCooldown = 0;
+  private volleyTimer = 0;
+  private shieldTimer = 0;
+  private surgeTimer = 0;
+  private healTimer = 0;
+  private magnetTimer = 0;
+  private healPulseTimer = 0;
   private nextSurge = 60;
   private dangerActive = false;
   private hudTimer = 0;
@@ -62,7 +65,9 @@ class ArenaScene extends Phaser.Scene {
   private player!: Phaser.Physics.Arcade.Image;
   private enemyGroup!: Phaser.Physics.Arcade.Group;
   private projectileGroup!: Phaser.Physics.Arcade.Group;
+  private enemyProjectileGroup!: Phaser.Physics.Arcade.Group;
   private xpGroup!: Phaser.Physics.Arcade.Group;
+  private perkGroup!: Phaser.Physics.Arcade.Group;
   private obstacleGroup!: Phaser.Physics.Arcade.StaticGroup;
   private telegraph!: Phaser.GameObjects.Graphics;
   private terrain!: Phaser.GameObjects.TileSprite;
@@ -83,13 +88,15 @@ class ArenaScene extends Phaser.Scene {
     if (!this.bridge) throw new Error('Lumenwake Phaser bridge was not initialized.');
     this.callbacks = this.bridge.callbacks;
     this.qaMode = new URLSearchParams(window.location.search).get('qa') === '1';
-    this.runDuration = 300;
+    this.levelId = DEFAULT_LEVEL_ID;
+    this.levelDefinition = getLevel(this.levelId);
+    this.runDuration = this.levelDefinition.duration;
     this.timeScale = this.qaMode ? 4 : 1;
     this.xpScale = this.qaMode ? 50 : 1;
     this.physics.world.setBounds(-1000000, -1000000, 2000000, 2000000);
     this.cameras.main.setBackgroundColor('#b7cf69');
     this.cameras.main.setRoundPixels(true);
-    this.createTerrain();
+    this.createTerrain(this.levelDefinition);
     this.createDecorations();
     this.createObstacles();
     this.createGroups();
@@ -111,7 +118,8 @@ class ArenaScene extends Phaser.Scene {
     this.updateTelegraphs();
   }
 
-  startRun(): void {
+  startRun(levelId: LevelId = this.levelId): void {
+    this.selectLevel(levelId);
     this.reset();
     this.handleResize();
     this.mode = 'running';
@@ -119,7 +127,22 @@ class ArenaScene extends Phaser.Scene {
     this.callbacks.onMode(this.mode);
     this.emitHud();
     sound.play('start');
-    this.callbacks.onToast('The garden wakes');
+    this.callbacks.onToast(`${this.levelDefinition.name} · the garden wakes`);
+  }
+
+  selectLevel(levelId: LevelId): void {
+    if (this.levelId === levelId) return;
+    this.levelId = levelId;
+    this.levelDefinition = getLevel(levelId);
+    this.runDuration = this.levelDefinition.duration;
+    if (this.terrain) this.rebuildTerrain();
+  }
+
+  returnToMenu(): void {
+    this.reset();
+    this.mode = 'ready';
+    this.scene.pause();
+    this.callbacks.onMode('ready');
   }
 
   pauseRun(): void {
@@ -179,9 +202,11 @@ class ArenaScene extends Phaser.Scene {
     return {
       mode: this.mode,
       elapsed: this.elapsed,
-      stage: this.stage,
-      stageName: stageAt(this.stage).name,
       level: this.level,
+      stage: this.stage,
+      stageName: stageAt(this.levelDefinition, this.stage).name,
+      levelId: this.levelDefinition.id,
+      levelName: this.levelDefinition.name,
       health: this.getHealth(),
       playerX: this.player?.x ?? START_CENTER,
       playerY: this.player?.y ?? START_CENTER,
@@ -189,6 +214,12 @@ class ArenaScene extends Phaser.Scene {
       kills: this.kills,
       enemies: this.enemyGroup?.getLength() ?? 0,
       projectiles: this.projectileGroup?.getLength() ?? 0,
+      perkLabel: this.getPerkStatus().label,
+      perkSeconds: this.getPerkStatus().seconds,
+      perks: this.perkGroup?.getLength() ?? 0,
+      spitters: this.enemyGroup?.getChildren().filter((child) => (child as Phaser.Physics.Arcade.Image).getData('kind') === 'spitter').length ?? 0,
+      spitterSpawns: this.spitterSpawns,
+      enemyProjectiles: this.enemyProjectileGroup?.getLength() ?? 0,
       upgradeRanks: Object.fromEntries(this.upgradeRanks),
       assetsReady: gameAssetNames.every((name) => this.textures.exists(name)),
       qa: this.qaMode,
@@ -223,6 +254,7 @@ class ArenaScene extends Phaser.Scene {
     this.xpNeeded = experienceNeeded(1);
     this.pendingLevels = 0;
     this.kills = 0;
+    this.spitterSpawns = 0;
     this.nextEntityId = 1;
     this.stats = { ...baseStats };
     this.upgradeRanks.clear();
@@ -230,13 +262,22 @@ class ArenaScene extends Phaser.Scene {
     this.footstepTimer = 0;
     this.projectileCooldown = 0;
     this.pulseCooldown = 0;
-    this.nextSurge = this.qaMode ? 10 : 60;
+    this.volleyTimer = 0;
+    this.shieldTimer = 0;
+    this.surgeTimer = 0;
+    this.healTimer = 0;
+    this.healPulseTimer = 0;
+    this.magnetTimer = 0;
+    this.xpScale = this.qaMode ? 50 : this.levelDefinition.xpScale;
+    this.nextSurge = this.qaMode ? 10 : Math.max(45, 60 / this.levelDefinition.spawnRateScale);
     this.dangerActive = false;
     this.setInput(0, 0);
     this.keys.clear();
     this.enemyGroup?.clear(true, true);
     this.projectileGroup?.clear(true, true);
+    this.enemyProjectileGroup?.clear(true, true);
     this.xpGroup?.clear(true, true);
+    this.perkGroup?.clear(true, true);
     if (this.player) {
       this.player.setPosition(START_CENTER, START_CENTER);
       this.player.setTexture('hero-0');
@@ -247,26 +288,148 @@ class ArenaScene extends Phaser.Scene {
     this.callbacks.onDanger(false);
   }
 
-  private createTerrain(): void {
+  private rebuildTerrain(): void {
+    this.terrain.destroy();
+    this.textures.remove('lumen-terrain-pattern');
+    this.createTerrain(this.levelDefinition);
+    this.handleResize();
+  }
+
+  private createTerrain(level: LevelDefinition = this.levelDefinition): void {
+    const terrainSize = 2240;
+    const centerX = 770;
+    const centerY = 770;
     const canvas = document.createElement('canvas');
-    canvas.width = 1120;
-    canvas.height = 1120;
+    canvas.width = terrainSize;
+    canvas.height = terrainSize;
     const context = canvas.getContext('2d');
     if (!context) return;
-    context.fillStyle = '#b9a865';
-    context.fillRect(0, 0, 1120, 1120);
-    const terrainFor = (column: number, row: number): string => {
-      if (row >= 5 && column <= 2) return 'terrain-dirt';
-      if (row <= 2 && column <= 2) return 'terrain-flowers';
-      return 'terrain-grass';
+    context.imageSmoothingEnabled = false;
+    context.fillStyle = level.theme.grass;
+    context.fillRect(0, 0, terrainSize, terrainSize);
+
+    const drawTexture = (asset: string, x: number, y: number, size: number, alpha: number, rotation = 0): void => {
+      const image = this.textures.get(asset).getSourceImage() as HTMLImageElement;
+      const sourceInset = 8;
+      const sourceWidth = Math.max(1, image.width - sourceInset * 2);
+      const sourceHeight = Math.max(1, image.height - sourceInset * 2);
+      context.save();
+      context.globalAlpha = alpha;
+      context.translate(x + size / 2, y + size / 2);
+      context.rotate(rotation);
+      context.drawImage(image, sourceInset, sourceInset, sourceWidth, sourceHeight, -size / 2, -size / 2, size, size);
+      context.restore();
     };
-    const tileAssets = Array.from({ length: 64 }, (_, index) => terrainFor(index % 8, Math.floor(index / 8)));
-    tileAssets.forEach((asset, index) => {
-      const image = this.textures.get(asset).getSourceImage() as CanvasImageSource;
-      const x = (index % 8) * 140;
-      const y = Math.floor(index / 8) * 140;
-      context.drawImage(image, x + 4, y + 4, 132, 132);
-    });
+
+    const drawBlob = (asset: string, x: number, y: number, size: number, alpha: number, rotation = 0): void => {
+      context.save();
+      context.beginPath();
+      context.ellipse(x + size / 2, y + size / 2, size * 0.5, size * 0.4, rotation, 0, TAU);
+      context.clip();
+      drawTexture(asset, x, y, size, alpha, rotation);
+      context.restore();
+    };
+
+    const groundMarks = level.theme.groundMark;
+    const groundShade = level.theme.groundShade;
+    for (let index = 0; index < 420; index += 1) {
+      const x = (index * 83 + 31) % terrainSize;
+      const y = (index * 149 + 17) % terrainSize;
+      const variation = (index * 17 + (index % 5) * 31) % 29;
+      context.fillStyle = variation < 6 ? groundMarks : groundShade;
+      if (variation < 6) context.fillRect(Math.round(x), Math.round(y), 3, 2);
+      else if (variation > 20) context.fillRect(Math.round(x), Math.round(y), 2, 4);
+    }
+
+    const drawForest = (x: number, y: number, radiusX: number, radiusY: number, seed: number): void => {
+      context.save();
+      context.fillStyle = level.theme.forest;
+      context.globalAlpha = 0.52;
+      context.beginPath();
+      for (let index = 0; index < 18; index += 1) {
+        const angle = (index / 18) * TAU;
+        const wobble = 1 + Math.sin(index * 4.7 + seed) * 0.1;
+        const pointX = x + Math.cos(angle) * radiusX * wobble;
+        const pointY = y + Math.sin(angle) * radiusY * wobble;
+        if (index === 0) context.moveTo(pointX, pointY);
+        else context.lineTo(pointX, pointY);
+      }
+      context.closePath();
+      context.fill();
+      context.restore();
+    };
+
+    drawForest(280, 290, 330, 250, 2);
+    drawForest(1960, 420, 310, 270, 7);
+    drawForest(1930, 1880, 360, 300, 11);
+    drawForest(300, 1900, 300, 280, 17);
+    drawForest(1540, 960, 260, 220, 23);
+    drawBlob('terrain-grass-dark', 140, 150, 170, 0.24, -0.18);
+    drawBlob('terrain-grass-dark', 1810, 280, 160, 0.24, 0.2);
+    drawBlob('terrain-grass-dark', 1780, 1770, 180, 0.24, -0.12);
+    drawBlob('terrain-grass-dark', 160, 1790, 170, 0.24, 0.16);
+    drawBlob('terrain-grass', 410, 300, 260, 0.18, -0.22);
+    drawBlob('terrain-grass', 1020, 300, 250, 0.16, 0.2);
+    drawBlob('terrain-grass', 400, 1120, 270, 0.16, 0.18);
+    drawBlob('terrain-grass', 1040, 1120, 250, 0.18, -0.16);
+    drawBlob('terrain-grass', 760, 500, 180, 0.14, 0.12);
+    drawBlob('terrain-grass', 780, 1040, 190, 0.14, -0.1);
+
+    const drawRoad = (width: number, color: string): void => {
+      context.save();
+      context.strokeStyle = color;
+      context.lineWidth = width;
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      context.beginPath();
+      context.moveTo(130, 1940);
+      context.quadraticCurveTo(470, 1450, centerX, centerY);
+      context.quadraticCurveTo(1080, 270, 2090, 320);
+      context.moveTo(centerX, centerY);
+      context.quadraticCurveTo(620, 430, 250, 180);
+      context.moveTo(centerX, centerY);
+      context.quadraticCurveTo(1220, 1120, 2020, 1960);
+      context.stroke();
+      context.restore();
+    };
+    drawRoad(78, level.theme.roadEdge);
+    drawRoad(58, level.theme.road);
+
+    context.save();
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.beginPath();
+    context.moveTo(1420, -40);
+    context.bezierCurveTo(1280, 360, 1540, 620, 1370, 950);
+    context.bezierCurveTo(1210, 1270, 1470, 1550, 1360, 1840);
+    context.bezierCurveTo(1280, 2020, 1390, 2140, 1330, 2280);
+    context.strokeStyle = level.theme.sand;
+    context.lineWidth = 124;
+    context.stroke();
+    context.strokeStyle = level.theme.water;
+    context.lineWidth = 92;
+    context.stroke();
+    context.strokeStyle = level.theme.waterHighlight;
+    context.lineWidth = 58;
+    context.stroke();
+    context.strokeStyle = 'rgba(203, 238, 199, 0.45)';
+    context.lineWidth = 8;
+    context.beginPath();
+    context.moveTo(1390, 0);
+    context.bezierCurveTo(1250, 360, 1510, 620, 1340, 950);
+    context.bezierCurveTo(1180, 1270, 1440, 1550, 1330, 1840);
+    context.bezierCurveTo(1250, 2020, 1360, 2140, 1300, 2280);
+    context.stroke();
+    context.restore();
+
+    drawBlob('terrain-flowers', 540, 570, 84, 0.46, -0.2);
+    drawBlob('terrain-flowers', 950, 580, 92, 0.5, 0.12);
+    drawBlob('terrain-flowers', 620, 1020, 88, 0.42, 0.2);
+    drawBlob('terrain-flowers', 1020, 1060, 78, 0.4, -0.16);
+    drawBlob('terrain-flowers', 360, 900, 76, 0.34, 0.1);
+    drawBlob('terrain-flowers', 1220, 260, 84, 0.34, -0.2);
+    drawBlob('terrain-flowers', 1120, 1420, 88, 0.36, 0.18);
+
     this.textures.addCanvas('lumen-terrain-pattern', canvas);
     this.terrain = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'lumen-terrain-pattern').setOrigin(0).setScrollFactor(0).setDepth(-100);
   }
@@ -289,7 +452,9 @@ class ArenaScene extends Phaser.Scene {
   private createGroups(): void {
     this.enemyGroup = this.physics.add.group();
     this.projectileGroup = this.physics.add.group();
+    this.enemyProjectileGroup = this.physics.add.group();
     this.xpGroup = this.physics.add.group();
+    this.perkGroup = this.physics.add.group();
   }
 
   private createPlayer(): void {
@@ -308,6 +473,7 @@ class ArenaScene extends Phaser.Scene {
     this.physics.add.collider(this.enemyGroup, this.obstacleGroup);
     this.physics.add.overlap(this.player, this.enemyGroup, (_player, enemy) => this.handleContact(enemy as Phaser.Physics.Arcade.Image));
     this.physics.add.overlap(this.player, this.xpGroup, (_player, drop) => this.collectXp(drop as Phaser.Physics.Arcade.Image));
+    this.physics.add.overlap(this.player, this.perkGroup, (_player, perk) => this.collectPerk(perk as Phaser.Physics.Arcade.Image));
   }
 
   private handleResize(): void {
@@ -332,7 +498,10 @@ class ArenaScene extends Phaser.Scene {
     this.updateEnemies(delta);
     this.updateAttacks(delta);
     this.updateProjectiles(delta);
+    this.updateEnemyProjectiles(delta);
     this.updateXp(delta);
+    this.updatePerks(delta);
+    this.updatePowerTimers(delta);
     this.updateDanger();
     this.hudTimer -= delta;
     if (this.hudTimer <= 0) {
@@ -344,8 +513,9 @@ class ArenaScene extends Phaser.Scene {
 
   private updatePlayer(delta: number): void {
     const body = this.player.body as Phaser.Physics.Arcade.Body;
-    const targetX = this.inputX * this.stats.moveSpeed;
-    const targetY = this.inputY * this.stats.moveSpeed;
+    const moveSpeed = this.stats.moveSpeed * (this.surgeTimer > 0 ? 1.28 : 1);
+    const targetX = this.inputX * moveSpeed;
+    const targetY = this.inputY * moveSpeed;
     body.velocity.x = Phaser.Math.Linear(body.velocity.x, targetX, 1 - Math.exp(-delta * 13));
     body.velocity.y = Phaser.Math.Linear(body.velocity.y, targetY, 1 - Math.exp(-delta * 13));
     const invulnerable = Math.max(0, Number(this.player.getData('invulnerable')) - delta);
@@ -367,30 +537,41 @@ class ArenaScene extends Phaser.Scene {
   }
 
   private updateStage(): void {
-    const nextStage = Math.min(STAGES.length - 1, Math.floor(this.elapsed / STAGE_DURATION));
+    const stageDuration = this.runDuration / Math.max(1, this.levelDefinition.stages.length - 1);
+    const nextStage = Math.min(this.levelDefinition.stages.length - 1, Math.floor(this.elapsed / stageDuration));
     if (nextStage === this.stage) return;
     this.stage = nextStage;
-    this.callbacks.onToast(`${stageAt(this.stage).name} · ${stageAt(this.stage).description}`);
+    const stage = stageAt(this.levelDefinition, this.stage);
+    this.callbacks.onToast(`${stage.name} · ${stage.description}`);
     sound.play('upgrade');
   }
 
   private updateSpawning(delta: number): void {
     if (this.elapsed >= this.nextSurge) {
-      this.nextSurge += 60;
-      const burst = this.qaMode ? 3 : Math.min(14, 7 + Math.floor(this.elapsed / 90));
+      this.nextSurge += Math.max(45, 60 / this.levelDefinition.spawnRateScale);
+      const burst = this.qaMode ? 3 : Math.min(22, Math.floor((7 + this.elapsed / 100) * this.levelDefinition.difficulty));
       for (let index = 0; index < burst; index += 1) this.spawnEnemy();
+      if (this.elapsed >= 60) this.spawnEnemy('spitter');
     }
     this.spawnTimer -= delta;
-    const interval = this.qaMode ? 0.42 : Math.max(0.22, 0.72 - this.elapsed * 0.00125);
-    const cap = this.qaMode ? 30 : Math.min(145, 45 + Math.floor(this.elapsed * 0.34));
+    const baseInterval = this.qaMode ? 0.42 : Math.max(0.16, 0.68 - this.elapsed * 0.00075);
+    const interval = baseInterval / this.levelDefinition.spawnRateScale;
+    const cap = this.qaMode ? 30 : Math.min(220, Math.floor((42 + this.elapsed * 0.28) * this.levelDefinition.enemyCapScale));
     if (this.spawnTimer <= 0) {
       this.spawnTimer = interval;
       if (this.enemyGroup.getLength() < cap) this.spawnEnemy();
     }
   }
 
-  private spawnEnemy(): void {
-    const kind: EnemyKind = Math.random() < (this.qaMode ? 0.28 : Phaser.Math.Clamp(0.16 + this.elapsed * 0.00085, 0.16, 0.43)) ? 'shell' : 'gnaw';
+  private spawnEnemy(forcedKind?: EnemyKind): void {
+    const difficulty = this.levelDefinition.difficulty;
+    const spitterChance = this.qaMode ? (this.elapsed >= 60 ? 0.08 : 0) : Phaser.Math.Clamp((this.elapsed - 60) / 1500 * difficulty, 0, 0.24);
+    const kind: EnemyKind = forcedKind ?? (Math.random() < spitterChance
+      ? 'spitter'
+      : Math.random() < (this.qaMode ? 0.28 : Phaser.Math.Clamp(0.16 + this.elapsed * 0.00072, 0.16, 0.4) * Math.min(1, difficulty))
+        ? 'shell'
+        : 'gnaw');
+    if (kind === 'spitter') this.spitterSpawns += 1;
     const side = Phaser.Math.Between(0, 3);
     const view = this.cameras.main.worldView;
     const margin = 44;
@@ -410,19 +591,25 @@ class ArenaScene extends Phaser.Scene {
       y = view.bottom + margin;
     }
     const intensity = this.elapsed / 100;
-    const healthScale = 1 + intensity * (kind === 'shell' ? 0.82 : 0.46);
-    const maxHealth = (kind === 'shell' ? 82 : 20) * healthScale;
-    const speed = kind === 'shell' ? Math.min(64, 40 + intensity * 2.8) : Math.min(154, 88 + intensity * 5.4);
-    const enemy = this.enemyGroup.create(x, y, kind === 'shell' ? 'enemy-golem-0' : 'enemy-shadow-0') as Phaser.Physics.Arcade.Image;
-    const size = kind === 'shell' ? 72 : 30;
-    enemy.setDisplaySize(size, kind === 'shell' ? 60 : 30).setDepth(10);
+    const healthScale = (1 + intensity * (kind === 'shell' ? 0.38 : kind === 'spitter' ? 0.32 : 0.18)) * difficulty;
+    const maxHealth = (kind === 'shell' ? 82 : kind === 'spitter' ? 48 : 20) * healthScale;
+    const speedScale = Math.sqrt(difficulty);
+    const speed = (kind === 'shell'
+      ? Math.min(70, 40 + intensity * 2.8)
+      : kind === 'spitter'
+        ? Math.min(78, 48 + intensity * 2.2)
+        : Math.min(166, 88 + intensity * 5.4)) * speedScale;
+    const enemy = this.enemyGroup.create(x, y, kind === 'gnaw' ? 'enemy-shadow-0' : 'enemy-golem-0') as Phaser.Physics.Arcade.Image;
+    const size = kind === 'shell' ? 72 : kind === 'spitter' ? 54 : 30;
+    enemy.setDisplaySize(size, kind === 'shell' ? 60 : kind === 'spitter' ? 54 : 30).setDepth(10);
     enemy.setData('id', this.nextEntityId++);
     enemy.setData('kind', kind);
     enemy.setData('health', maxHealth);
     enemy.setData('maxHealth', maxHealth);
     enemy.setData('speed', speed);
-    enemy.setData('damage', kind === 'shell' ? 16 : 8);
-    enemy.setData('xp', kind === 'shell' ? 6 : 2);
+    enemy.setData('damage', kind === 'shell' ? 16 : kind === 'spitter' ? 10 : 8);
+    enemy.setData('xp', kind === 'shell' ? 6 : kind === 'spitter' ? 5 : 2);
+    enemy.setData('shotTimer', 1.2 + Math.random() * 1.6);
     enemy.setData('age', Math.random() * 8);
     enemy.setData('phase', Math.random() * TAU);
     enemy.setData('state', 'pursue');
@@ -430,7 +617,7 @@ class ArenaScene extends Phaser.Scene {
     enemy.setData('chargeX', 0);
     enemy.setData('chargeY', 0);
     const body = enemy.body as Phaser.Physics.Arcade.Body;
-    body.setCircle(kind === 'shell' ? 28 : 12);
+    body.setCircle(kind === 'shell' ? 28 : kind === 'spitter' ? 20 : 12);
     body.setImmovable(false);
   }
 
@@ -446,7 +633,20 @@ class ArenaScene extends Phaser.Scene {
       const distance = Math.max(0.001, Math.hypot(dx, dy));
       let moveX = dx / distance;
       let moveY = dy / distance;
-      if (kind === 'gnaw') {
+      if (kind === 'spitter') {
+        const baseX = dx / distance;
+        const baseY = dy / distance;
+        const radial = distance < 230 ? -1 : distance > 350 ? 1 : 0;
+        const strafe = Math.sin(age * 1.8 + Number(enemy.getData('phase'))) * 0.42;
+        moveX = baseX * radial - baseY * strafe;
+        moveY = baseY * radial + baseX * strafe;
+        let shotTimer = Number(enemy.getData('shotTimer')) - delta;
+        if (shotTimer <= 0 && distance < 600) {
+          this.fireEnemyProjectile(enemy);
+          shotTimer = Math.max(1.7, 3.4 - this.elapsed / 900);
+        }
+        enemy.setData('shotTimer', shotTimer);
+      } else if (kind === 'gnaw') {
         const weave = Math.sin(age * 8 + Number(enemy.getData('phase'))) * 0.24;
         moveX -= moveY * weave;
         moveY += moveX * weave;
@@ -485,11 +685,27 @@ class ArenaScene extends Phaser.Scene {
       }
       const speed = Number(enemy.getData('speed')) * (enemy.getData('state') === 'charge' ? 3.8 : 1);
       body.velocity.set(moveX * speed, moveY * speed);
-      if (kind === 'shell') enemy.setTexture('enemy-golem-0');
-      else enemy.setTexture('enemy-shadow-0');
+      if (kind === 'spitter') {
+        enemy.setTexture('enemy-golem-0');
+        enemy.setTint(0x65f4db);
+      } else {
+        if (kind === 'shell') enemy.setTexture('enemy-golem-0');
+        else enemy.setTexture('enemy-shadow-0');
+        enemy.setTint(0xffffff);
+      }
       enemy.setFlipX(dx < 0);
-      enemy.setTint(0xffffff);
     }
+  }
+
+  private fireEnemyProjectile(enemy: Phaser.Physics.Arcade.Image): void {
+    const angle = Math.atan2(this.player.y - enemy.y, this.player.x - enemy.x);
+    const projectile = this.enemyProjectileGroup.create(enemy.x, enemy.y, 'projectile') as Phaser.Physics.Arcade.Image;
+    projectile.setDisplaySize(18, 18).setDepth(18).setTint(0xff5e73);
+    projectile.setData('life', 3.2);
+    projectile.setData('damage', 12);
+    const body = projectile.body as Phaser.Physics.Arcade.Body;
+    body.setCircle(8);
+    body.setVelocity(Math.cos(angle) * 340, Math.sin(angle) * 340);
   }
 
   private updateAttacks(delta: number): void {
@@ -517,7 +733,7 @@ class ArenaScene extends Phaser.Scene {
 
   private fireDarts(target: Phaser.Physics.Arcade.Image): void {
     const angle = Math.atan2(target.y - this.player.y, target.x - this.player.x);
-    const count = this.stats.projectileCount;
+    const count = this.stats.projectileCount + (this.volleyTimer > 0 ? 2 : 0);
     for (let index = 0; index < count; index += 1) {
       const offset = index - (count - 1) / 2;
       const direction = angle + offset * 0.12;
@@ -565,6 +781,23 @@ class ArenaScene extends Phaser.Scene {
     }
   }
 
+  private updateEnemyProjectiles(delta: number): void {
+    for (const child of this.enemyProjectileGroup.getChildren()) {
+      const projectile = child as Phaser.Physics.Arcade.Image;
+      const life = Number(projectile.getData('life')) - delta;
+      projectile.setData('life', life);
+      if (life <= 0 || Phaser.Math.Distance.Between(projectile.x, projectile.y, this.player.x, this.player.y) > 18) {
+        if (life <= 0) projectile.destroy();
+        continue;
+      }
+      const damage = Number(projectile.getData('damage'));
+      const sourceX = projectile.x;
+      const sourceY = projectile.y;
+      projectile.destroy();
+      this.damagePlayer(damage, sourceX, sourceY);
+    }
+  }
+
   private damageEnemy(enemy: Phaser.Physics.Arcade.Image, damage: number): void {
     if (!enemy.active) return;
     const health = Number(enemy.getData('health')) - damage;
@@ -580,15 +813,20 @@ class ArenaScene extends Phaser.Scene {
     sound.play('kill');
     const dropCount = enemy.getData('kind') === 'shell' ? 2 : 1;
     for (let index = 0; index < dropCount; index += 1) this.spawnXp(enemy.x, enemy.y, Number(enemy.getData('xp')) / dropCount);
+    if (Math.random() < (this.qaMode ? 0.2 : 0.12) && this.perkGroup.getLength() < 3) this.spawnPerk(enemy.x, enemy.y);
   }
 
-  private handleContact(enemy: Phaser.Physics.Arcade.Image): void {
+  private damagePlayer(amount: number, sourceX: number, sourceY: number): void {
     if (this.player.getData('invulnerable') > 0) return;
-    const amount = Number(enemy.getData('damage')) * (enemy.getData('state') === 'charge' ? 1.35 : 1);
+    if (this.shieldTimer > 0) {
+      this.spawnImpact(this.player.x, this.player.y, 56, '#65f4db');
+      sound.play('pulse');
+      return;
+    }
     const health = this.getHealth() - amount;
     this.player.setData('health', health);
     this.player.setData('invulnerable', 0.68);
-    const direction = new Phaser.Math.Vector2(this.player.x - enemy.x, this.player.y - enemy.y).normalize().scale(190);
+    const direction = new Phaser.Math.Vector2(this.player.x - sourceX, this.player.y - sourceY).normalize().scale(190);
     const body = this.player.body as Phaser.Physics.Arcade.Body;
     body.velocity.add(direction);
     this.spawnImpact(this.player.x, this.player.y, 48, '#ff4d69');
@@ -596,6 +834,11 @@ class ArenaScene extends Phaser.Scene {
     sound.play('hurt');
     this.cameras.main.shake(90, 0.004);
     if (health <= 0) this.finish(false);
+  }
+
+  private handleContact(enemy: Phaser.Physics.Arcade.Image): void {
+    const amount = Number(enemy.getData('damage')) * (enemy.getData('state') === 'charge' ? 1.35 : 1);
+    this.damagePlayer(amount, enemy.x, enemy.y);
   }
 
   private collectXp(drop: Phaser.Physics.Arcade.Image): void {
@@ -633,10 +876,11 @@ class ArenaScene extends Phaser.Scene {
         this.collectXp(drop);
         continue;
       }
-      const magnetized = distance < this.stats.pickupRadius;
+      const magnetized = distance < this.stats.pickupRadius * (this.magnetTimer > 0 ? 2.2 : 1);
       if (magnetized) {
-        body.velocity.x += dx / distance * 860 * delta;
-        body.velocity.y += dy / distance * 860 * delta;
+        const pull = this.magnetTimer > 0 ? 1240 : 860;
+        body.velocity.x += dx / distance * pull * delta;
+        body.velocity.y += dy / distance * pull * delta;
       }
       const drag = Math.exp(-delta * (magnetized ? 2.2 : 5.2));
       body.velocity.x *= drag;
@@ -644,6 +888,91 @@ class ArenaScene extends Phaser.Scene {
       drop.setRotation(drop.rotation + delta * 2);
     }
     if (this.pendingLevels > 0 && this.mode === 'running') this.openUpgrade();
+  }
+
+  private spawnPerk(x: number, y: number): void {
+    const kinds: PerkKind[] = ['volley', 'shield', 'surge', 'heal', 'magnet'];
+    const kind = kinds[Math.floor(Math.random() * kinds.length)] ?? 'volley';
+    const perk = this.perkGroup.create(x, y, 'xp-coin') as Phaser.Physics.Arcade.Image;
+    perk.setDisplaySize(24, 24).setDepth(14).setTint(perkDefinitions[kind].color);
+    perk.setData('kind', kind);
+    perk.setData('age', Math.random() * TAU);
+    const angle = Math.random() * TAU;
+    const body = perk.body as Phaser.Physics.Arcade.Body;
+    body.setCircle(12);
+    body.setVelocity(Math.cos(angle) * 54, Math.sin(angle) * 54);
+  }
+
+  private updatePerks(delta: number): void {
+    for (const child of this.perkGroup.getChildren()) {
+      const perk = child as Phaser.Physics.Arcade.Image;
+      const body = perk.body as Phaser.Physics.Arcade.Body;
+      const dx = this.player.x - perk.x;
+      const dy = this.player.y - perk.y;
+      const distance = Math.max(0.001, Math.hypot(dx, dy));
+      if (distance < 30) {
+        this.collectPerk(perk);
+        continue;
+      }
+      const pickupRadius = this.stats.pickupRadius * (this.surgeTimer > 0 ? 1.25 : 1) * (this.magnetTimer > 0 ? 2.2 : 1);
+      const magnetized = distance < pickupRadius;
+      if (magnetized) {
+        const pull = this.magnetTimer > 0 ? 1200 : 760;
+        body.velocity.x += dx / distance * pull * delta;
+        body.velocity.y += dy / distance * pull * delta;
+      }
+      const drag = Math.exp(-delta * (magnetized ? 2.4 : 5.6));
+      body.velocity.x *= drag;
+      body.velocity.y *= drag;
+      perk.setRotation(perk.rotation + delta * 3);
+    }
+  }
+
+  private collectPerk(perk: Phaser.Physics.Arcade.Image): void {
+    const kind = perk.getData('kind') as PerkKind;
+    if (!perkDefinitions[kind]) return;
+    perk.destroy();
+    if (kind === 'volley') this.volleyTimer = 18;
+    if (kind === 'shield') this.shieldTimer = 8;
+    if (kind === 'surge') this.surgeTimer = 12;
+    if (kind === 'heal') {
+      this.healTimer = 15;
+      this.healPulseTimer = 0;
+    }
+    if (kind === 'magnet') this.magnetTimer = 12;
+    this.callbacks.onToast(`${perkDefinitions[kind].name} · ${perkDefinitions[kind].description}`);
+    sound.play('upgrade');
+  }
+
+  private updatePowerTimers(delta: number): void {
+    this.volleyTimer = Math.max(0, this.volleyTimer - delta);
+    this.shieldTimer = Math.max(0, this.shieldTimer - delta);
+    this.surgeTimer = Math.max(0, this.surgeTimer - delta);
+    if (this.healTimer > 0) {
+      this.healPulseTimer -= delta;
+      if (this.healPulseTimer <= 0) {
+        const currentHealth = this.getHealth();
+        const healed = Math.min(2.5, this.stats.maxHealth - currentHealth);
+        if (healed > 0) {
+          this.player.setData('health', currentHealth + healed);
+          this.spawnImpact(this.player.x, this.player.y, 34, '#ff8fa3');
+          this.spawnDamageText(this.player.x, this.player.y - 28, Math.round(healed), '#b7ffcb');
+        }
+        this.healPulseTimer = 0.5;
+      }
+    }
+    this.healTimer = Math.max(0, this.healTimer - delta);
+    this.magnetTimer = Math.max(0, this.magnetTimer - delta);
+  }
+
+  private getPerkStatus(): { label: string; seconds: number } {
+    const active: string[] = [];
+    if (this.volleyTimer > 0) active.push(`VOLLEY ${Math.ceil(this.volleyTimer)}S`);
+    if (this.shieldTimer > 0) active.push(`SHIELD ${Math.ceil(this.shieldTimer)}S`);
+    if (this.surgeTimer > 0) active.push(`SURGE ${Math.ceil(this.surgeTimer)}S`);
+    if (this.healTimer > 0) active.push(`RENEWAL ${Math.ceil(this.healTimer)}S`);
+    if (this.magnetTimer > 0) active.push(`MAGNET ${Math.ceil(this.magnetTimer)}S`);
+    return { label: active.join(' · '), seconds: Math.max(this.volleyTimer, this.shieldTimer, this.surgeTimer, this.healTimer, this.magnetTimer) };
   }
 
   private spawnImpact(x: number, y: number, size: number, color?: string): void {
@@ -722,6 +1051,7 @@ class ArenaScene extends Phaser.Scene {
   }
 
   private getHud(): HudState {
+    const perkStatus = this.getPerkStatus();
     return {
       health: Math.ceil(this.getHealth()),
       maxHealth: Math.round(this.stats.maxHealth),
@@ -732,8 +1062,12 @@ class ArenaScene extends Phaser.Scene {
       remaining: Math.max(0, this.runDuration - this.elapsed),
       kills: this.kills,
       stage: this.stage,
-      stageName: stageAt(this.stage).name,
-      stageDescription: stageAt(this.stage).description,
+      stageName: stageAt(this.levelDefinition, this.stage).name,
+      stageDescription: stageAt(this.levelDefinition, this.stage).description,
+      levelId: this.levelDefinition.id,
+      levelName: this.levelDefinition.name,
+      perkLabel: perkStatus.label,
+      perkSeconds: perkStatus.seconds,
     };
   }
 
@@ -763,6 +1097,7 @@ class ArenaScene extends Phaser.Scene {
 export class PhaserGame {
   private readonly game: Phaser.Game;
   private scene: ArenaScene | null = null;
+  private levelId: LevelId = DEFAULT_LEVEL_ID;
 
   constructor(canvas: HTMLCanvasElement, callbacks: GameCallbacks) {
     ArenaScene.bridge = { callbacks, scene: null };
@@ -782,12 +1117,23 @@ export class PhaserGame {
     this.game = game;
   }
 
-  start(): void {
-    this.scene?.startRun();
+  start(levelId: LevelId = this.levelId): void {
+    this.levelId = levelId;
+    this.scene?.startRun(levelId);
   }
 
-  restart(): void {
-    this.scene?.startRun();
+  selectLevel(levelId: LevelId): void {
+    this.levelId = levelId;
+    this.scene?.selectLevel(levelId);
+  }
+
+  restart(levelId: LevelId = this.levelId): void {
+    this.levelId = levelId;
+    this.scene?.startRun(levelId);
+  }
+
+  returnToMenu(): void {
+    this.scene?.returnToMenu();
   }
 
   pause(): void {
@@ -826,7 +1172,7 @@ export class PhaserGame {
 
   snapshot(): GameSnapshot {
     return this.scene?.snapshot() ?? {
-      mode: 'ready', elapsed: 0, level: 1, health: 100, playerX: START_CENTER, playerY: START_CENTER, xp: 0, kills: 0, enemies: 0, projectiles: 0, upgradeRanks: {}, assetsReady: false, qa: new URLSearchParams(window.location.search).get('qa') === '1',
+      mode: 'ready', elapsed: 0, level: 1, health: 100, playerX: START_CENTER, playerY: START_CENTER, xp: 0, kills: 0, enemies: 0, projectiles: 0, upgradeRanks: {}, assetsReady: false, qa: new URLSearchParams(window.location.search).get('qa') === '1', levelId: this.levelId, levelName: getLevel(this.levelId).name,
     };
   }
 

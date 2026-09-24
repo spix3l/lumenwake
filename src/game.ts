@@ -1,5 +1,6 @@
 import { GameAssets } from './assets';
 import { applyUpgrade, baseStats, experienceNeeded, getUpgrade, upgrades, type Stats, type Upgrade, type UpgradeId } from './upgrades';
+import type { LevelId } from './levels';
 import { resolveObstacleCollision, WorldRenderer } from './world';
 
 export type GameMode = 'ready' | 'running' | 'paused' | 'upgrade' | 'gameover' | 'victory';
@@ -16,6 +17,10 @@ export interface HudState {
   stage?: number;
   stageName?: string;
   stageDescription?: string;
+  levelId: LevelId;
+  levelName?: string;
+  perkLabel?: string;
+  perkSeconds?: number;
 }
 
 export interface GameCallbacks {
@@ -150,9 +155,17 @@ export interface GameSnapshot {
   qa: boolean;
   stage?: number;
   stageName?: string;
+  levelId: LevelId;
+  levelName?: string;
+  perkLabel?: string;
+  perkSeconds?: number;
+  perks?: number;
+  spitters?: number;
+  spitterSpawns?: number;
+  enemyProjectiles?: number;
 }
 
-const RUN_DURATION = 300;
+const RUN_DURATION = 600;
 const START_CENTER = 700;
 const TAU = Math.PI * 2;
 
@@ -333,8 +346,10 @@ export class LumenwakeGame {
       projectiles: this.projectiles.length,
       upgradeRanks: Object.fromEntries(this.upgradeRanks),
       assetsReady: this.assets.isReady(),
-      qa: this.qaMode,
-    };
+       qa: this.qaMode,
+       levelId: 'rootway',
+       levelName: 'Rootway',
+     };
   }
 
   debugVictory(): void {
@@ -887,6 +902,8 @@ export class LumenwakeGame {
       elapsed: this.elapsed,
       remaining: Math.max(0, this.runDuration - this.elapsed),
       kills: this.kills,
+      levelId: 'rootway',
+      levelName: 'Rootway',
     };
   }
 

@@ -53,6 +53,20 @@ export const decorations: Array<{ asset: ObstacleAsset; x: number; y: number; si
   { asset: 'prop-bush', x: 490, y: 770, size: 34 },
   { asset: 'prop-flowers', x: 630, y: 770, size: 36 },
   { asset: 'prop-mushrooms', x: 770, y: 770, size: 38 },
+  { asset: 'prop-bush', x: 180, y: 350, size: 48 },
+  { asset: 'prop-mushrooms', x: 250, y: 470, size: 38 },
+  { asset: 'prop-bush', x: 470, y: 180, size: 44 },
+  { asset: 'prop-ground-flowers', x: 610, y: 230, size: 36 },
+  { asset: 'prop-rock', x: 1140, y: 280, size: 44 },
+  { asset: 'prop-bush', x: 1230, y: 430, size: 46 },
+  { asset: 'prop-ground-flowers', x: 980, y: 300, size: 34 },
+  { asset: 'prop-bush', x: 210, y: 1040, size: 48 },
+  { asset: 'prop-mushrooms', x: 360, y: 1120, size: 40 },
+  { asset: 'prop-flowers', x: 520, y: 1240, size: 36 },
+  { asset: 'prop-rock', x: 900, y: 1120, size: 44 },
+  { asset: 'prop-bush', x: 1040, y: 1200, size: 50 },
+  { asset: 'prop-mushrooms', x: 1190, y: 1060, size: 38 },
+  { asset: 'prop-ground-flowers', x: 1340, y: 1020, size: 40 },
 ];
 
 const terrainTiles: TerrainTile[] = [];

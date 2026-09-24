@@ -27,7 +27,7 @@
 
         <section class="time-readout" aria-label="Time remaining and stage">
           <span id="stage-label">STAGE 1</span>
-          <strong id="time-text">05:00</strong>
+          <strong id="time-text">10:00</strong>
         </section>
 
         <div class="hud-actions">
@@ -37,6 +37,8 @@
           </button>
         </div>
       </header>
+
+      <div id="perk-status" role="status" aria-live="polite" hidden></div>
 
       <div id="xp-readout" aria-label="Experience" hidden>
         <div class="xp-copy"><span id="xp-label">GROWTH 0%</span><strong id="xp-level-text">LV 1</strong></div>
@@ -64,29 +66,53 @@
 
       <section id="start-screen" class="overlay" aria-labelledby="game-title" aria-label="Lumenwake main menu" hidden>
         <div class="start-panel">
-          <div class="eyebrow"><span></span> MOONLIT GARDEN · RUN 01</div>
+          <div class="eyebrow"><span></span> MOONLIT GARDEN · MAIN MENU</div>
           <h1 id="game-title"><span>Lumen</span>wake</h1>
-          <p class="start-lede">Carry the last spark through five minutes of hungry dark.</p>
+          <p class="start-lede">Choose a run, carry the last spark, and hold the garden until dawn.</p>
 
-          <div class="tutorial-grid" aria-label="How to play">
-            <div><span class="tutorial-index">01</span><p><strong>Move</strong><small>WASD, arrows, or drag</small></p></div>
-            <div><span class="tutorial-index">02</span><p><strong>Trust your glow</strong><small>Attacks fire on their own</small></p></div>
-            <div><span class="tutorial-index">03</span><p><strong>Grow strange</strong><small>Collect light, choose a boon</small></p></div>
-          </div>
+          <section class="level-picker" aria-labelledby="level-picker-title">
+            <div class="level-picker-copy">
+              <div class="eyebrow"><span></span> SELECT A RUN</div>
+              <h2 id="level-picker-title">Rootway</h2>
+              <p id="level-description">A gentle opening through the waking garden. Learn the rhythm before the roots notice you.</p>
+            </div>
+            <div id="level-options" class="level-options" role="group" aria-label="Playable levels"></div>
+          </section>
 
           <div class="start-actions">
-            <button id="start-button" class="primary-button" type="button">Enter the garden <span aria-hidden="true">→</span></button>
+            <button id="start-button" class="primary-button" type="button"><span id="start-button-label">Enter the garden</span> <span aria-hidden="true">→</span></button>
             <button id="install-button" class="secondary-button" type="button">Install game</button>
           </div>
           <div class="menu-options">
-            <button id="sound-toggle" class="menu-option" type="button" aria-pressed="true">
-              <span class="sound-bars" aria-hidden="true"><i></i><i></i><i></i></span>
-              <span id="sound-label">Sound: on</span>
-            </button>
+            <button id="settings-button" class="menu-option" type="button">Settings</button>
+            <a id="support-link" class="support-link" href="https://buymeacoffee.com/spix3l" target="_blank" rel="noopener noreferrer">Support the project ↗</a>
             <span class="menu-hint">Press Enter to begin</span>
           </div>
           <p id="install-status" class="install-status" role="status"></p>
-          <div class="run-note"><span></span> Survive until dawn to win</div>
+          <div class="run-note"><span></span> Every run has its own rhythm</div>
+        </div>
+      </section>
+
+      <section id="settings-screen" class="overlay compact-overlay" aria-labelledby="settings-title" hidden>
+        <div class="modal-panel settings-panel">
+          <div class="eyebrow"><span></span> LISTEN CLOSELY</div>
+          <h2 id="settings-title">Settings</h2>
+          <p>Balance the music and effects to keep the garden comfortable.</p>
+          <div class="settings-grid">
+            <section class="settings-channel" aria-labelledby="game-sound-title">
+              <div class="settings-channel-head"><h3 id="game-sound-title">Game sound</h3><span id="game-audio-state">On</span></div>
+              <button id="game-audio-toggle" class="menu-option" type="button" aria-pressed="true">Toggle game sound</button>
+              <label class="volume-control" for="game-volume"><span>Volume</span><output id="game-volume-value">12%</output></label>
+              <input id="game-volume" type="range" min="0" max="100" value="12" />
+            </section>
+            <section class="settings-channel" aria-labelledby="effects-sound-title">
+              <div class="settings-channel-head"><h3 id="effects-sound-title">Effects sound</h3><span id="effects-audio-state">On</span></div>
+              <button id="effects-audio-toggle" class="menu-option" type="button" aria-pressed="true">Toggle effects sound</button>
+              <label class="volume-control" for="effects-volume"><span>Volume</span><output id="effects-volume-value">42%</output></label>
+              <input id="effects-volume" type="range" min="0" max="100" value="42" />
+            </section>
+          </div>
+          <div class="modal-actions"><button id="settings-back-button" class="primary-button" type="button">Back to main menu</button></div>
         </div>
       </section>
 
@@ -103,6 +129,7 @@
           <div class="modal-actions">
             <button id="resume-button" class="primary-button" type="button">Return to the dark</button>
             <button id="pause-restart-button" class="secondary-button" type="button">Restart run</button>
+            <button id="pause-menu-button" class="secondary-button" type="button">Main menu</button>
           </div>
         </div>
       </section>
@@ -123,7 +150,7 @@
           <h2 id="end-title">Dawn secured</h2>
           <p id="end-message">The last spark held until sunrise.</p>
           <div class="modal-stats">
-            <div><span>TIME</span><strong id="end-time">05:00</strong></div>
+            <div><span>TIME</span><strong id="end-time">10:00</strong></div>
             <div><span>LEVEL</span><strong id="end-level">1</strong></div>
             <div><span>CLEARS</span><strong id="end-kills">0</strong></div>
           </div>

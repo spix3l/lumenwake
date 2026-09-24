@@ -1,5 +1,6 @@
 import './style.css';
 import { sound } from './audio';
+import { DEFAULT_LEVEL_ID, levels, type LevelId } from './levels';
 import { PhaserGame } from './phaser-game';
 import type { GameMode, GameSnapshot, HudState } from './game';
 import type { Upgrade, UpgradeId } from './upgrades';
@@ -36,11 +37,13 @@ const body = document.body;
 const canvas = element<HTMLCanvasElement>('game-canvas');
 const loadingScreen = element<HTMLElement>('loading-screen');
 const startScreen = element<HTMLElement>('start-screen');
+const settingsScreen = element<HTMLElement>('settings-screen');
 const pauseScreen = element<HTMLElement>('pause-screen');
 const upgradeScreen = element<HTMLElement>('upgrade-screen');
 const endScreen = element<HTMLElement>('end-screen');
 const fatalScreen = element<HTMLElement>('fatal-screen');
 const hud = element<HTMLElement>('hud');
+const perkStatus = element<HTMLElement>('perk-status');
 const xpReadout = element<HTMLElement>('xp-readout');
 const joystick = element<HTMLElement>('joystick');
 const joystickKnob = element<HTMLElement>('joystick-knob');
@@ -51,8 +54,6 @@ const stageBannerTitle = element<HTMLElement>('stage-banner-title');
 const stageBannerCopy = element<HTMLElement>('stage-banner-copy');
 const startButton = element<HTMLButtonElement>('start-button');
 const installButton = element<HTMLButtonElement>('install-button');
-const soundToggle = element<HTMLButtonElement>('sound-toggle');
-const soundLabel = element<HTMLElement>('sound-label');
 const installStatus = element<HTMLElement>('install-status');
 const pauseButton = element<HTMLButtonElement>('pause-button');
 const resumeButton = element<HTMLButtonElement>('resume-button');
@@ -77,8 +78,25 @@ const endEyebrow = element<HTMLElement>('end-eyebrow');
 const endTime = element<HTMLElement>('end-time');
 const endLevel = element<HTMLElement>('end-level');
 const endKills = element<HTMLElement>('end-kills');
+const levelOptions = element<HTMLDivElement>('level-options');
+const levelTitle = element<HTMLElement>('level-picker-title');
+const levelDescription = element<HTMLElement>('level-description');
+const startButtonLabel = element<HTMLElement>('start-button-label');
+const settingsButton = element<HTMLButtonElement>('settings-button');
+const gameAudioToggle = element<HTMLButtonElement>('game-audio-toggle');
+const effectsAudioToggle = element<HTMLButtonElement>('effects-audio-toggle');
+const gameAudioState = element<HTMLElement>('game-audio-state');
+const effectsAudioState = element<HTMLElement>('effects-audio-state');
+const gameVolume = element<HTMLInputElement>('game-volume');
+const effectsVolume = element<HTMLInputElement>('effects-volume');
+const gameVolumeValue = element<HTMLOutputElement>('game-volume-value');
+const effectsVolumeValue = element<HTMLOutputElement>('effects-volume-value');
+const settingsBackButton = element<HTMLButtonElement>('settings-back-button');
+const pauseMenuButton = element<HTMLButtonElement>('pause-menu-button');
 
 let currentMode: GameMode = 'ready';
+let selectedLevelId: LevelId = DEFAULT_LEVEL_ID;
+let settingsOpen = false;
 let currentChoices: Upgrade[] = [];
 let toastTimer = 0;
 let stageBannerTimer = 0;
@@ -96,6 +114,7 @@ function showScreen(screen: HTMLElement, visible: boolean): void {
 function setMode(mode: GameMode): void {
   currentMode = mode;
   body.dataset.mode = mode;
+  if (mode !== 'running' && mode !== 'paused') perkStatus.hidden = true;
   if (mode === 'ready' || mode === 'victory') sound.setMusic('menu');
   else if (mode === 'gameover') sound.setMusic('ambient');
   else {
@@ -103,7 +122,8 @@ function setMode(mode: GameMode): void {
     if (mode === 'paused' || mode === 'upgrade') sound.pauseMusic();
   }
   showScreen(loadingScreen, false);
-  showScreen(startScreen, mode === 'ready');
+  showScreen(settingsScreen, false);
+  showScreen(startScreen, mode === 'ready' && !settingsOpen);
   showScreen(pauseScreen, mode === 'paused');
   showScreen(upgradeScreen, mode === 'upgrade');
   showScreen(endScreen, mode === 'gameover' || mode === 'victory');
@@ -126,6 +146,8 @@ function updateHud(hudState: HudState): void {
   timeText.textContent = formatTime(hudState.remaining);
   levelText.textContent = String(hudState.level);
   stageLabel.textContent = `STAGE ${(hudState.stage ?? 0) + 1}`;
+  perkStatus.hidden = !hudState.perkLabel || (hudState.perkSeconds ?? 0) <= 0;
+  if (!perkStatus.hidden) perkStatus.textContent = hudState.perkLabel ?? '';
   showStageBanner(hudState);
   pauseTime.textContent = formatTime(hudState.elapsed);
   pauseLevel.textContent = String(hudState.level);
@@ -163,10 +185,61 @@ function showStageBanner(hudState: HudState): void {
   }, 2300);
 }
 
-function updateSoundToggle(): void {
-  const muted = sound.isMuted();
-  soundToggle.setAttribute('aria-pressed', String(!muted));
-  soundLabel.textContent = muted ? 'Sound: off' : 'Sound: on';
+function renderLevelOptions(): void {
+  const selectedLevel = levels.find((level) => level.id === selectedLevelId) ?? levels[0]!;
+  levelTitle.textContent = selectedLevel.name;
+  levelDescription.textContent = selectedLevel.description;
+  startButtonLabel.textContent = `Enter ${selectedLevel.name}`;
+  levelOptions.replaceChildren();
+  for (const level of levels) {
+    const button = document.createElement('button');
+    button.className = 'level-option';
+    button.type = 'button';
+    button.dataset.levelId = level.id;
+    button.classList.toggle('is-selected', level.id === selectedLevelId);
+    button.setAttribute('aria-pressed', String(level.id === selectedLevelId));
+    const name = document.createElement('strong');
+    name.textContent = level.name;
+    const meta = document.createElement('span');
+    meta.textContent = `${Math.round(level.duration / 60)} min · ${level.difficulty < 1.1 ? 'gentle' : level.difficulty < 1.35 ? 'hungry' : 'relentless'}`;
+    const description = document.createElement('small');
+    description.textContent = level.eyebrow;
+    button.append(name, meta, description);
+    button.addEventListener('click', () => {
+      selectedLevelId = level.id;
+      game.selectLevel(level.id);
+      renderLevelOptions();
+      sound.play('ui');
+    });
+    levelOptions.append(button);
+  }
+}
+
+function updateAudioSettings(): void {
+  const settings = sound.getSettings();
+  gameAudioToggle.setAttribute('aria-pressed', String(settings.gameEnabled));
+  effectsAudioToggle.setAttribute('aria-pressed', String(settings.effectsEnabled));
+  gameAudioState.textContent = settings.gameEnabled ? 'On' : 'Off';
+  effectsAudioState.textContent = settings.effectsEnabled ? 'On' : 'Off';
+  gameVolume.value = String(Math.round(settings.gameVolume * 100));
+  effectsVolume.value = String(Math.round(settings.effectsVolume * 100));
+  gameVolumeValue.value = `${Math.round(settings.gameVolume * 100)}%`;
+  effectsVolumeValue.value = `${Math.round(settings.effectsVolume * 100)}%`;
+}
+
+function openSettings(): void {
+  settingsOpen = true;
+  showScreen(startScreen, false);
+  showScreen(settingsScreen, true);
+  updateAudioSettings();
+  sound.play('ui');
+}
+
+function closeSettings(): void {
+  settingsOpen = false;
+  showScreen(settingsScreen, false);
+  showScreen(startScreen, currentMode === 'ready');
+  sound.play('ui');
 }
 
 function renderUpgradeChoices(choices: Upgrade[], level: number): void {
@@ -296,7 +369,7 @@ window.addEventListener('keydown', (event) => {
   }
   if (currentMode === 'ready' && event.code === 'Enter' && document.activeElement === canvas) {
     sound.unlock();
-    game.start();
+    game.start(selectedLevelId);
   }
 });
 
@@ -311,25 +384,46 @@ document.addEventListener('visibilitychange', () => {
 
 startButton.addEventListener('click', () => {
   sound.unlock();
-  game.start();
+  game.start(selectedLevelId);
 });
+settingsButton.addEventListener('click', openSettings);
+settingsBackButton.addEventListener('click', closeSettings);
 pauseButton.addEventListener('click', () => game.pause());
 resumeButton.addEventListener('click', () => game.resume());
 pauseRestartButton.addEventListener('click', () => {
   lastStage = -1;
-  game.restart();
+  game.restart(selectedLevelId);
 });
 restartButton.addEventListener('click', () => {
   lastStage = -1;
-  game.restart();
+  game.restart(selectedLevelId);
 });
-soundToggle.addEventListener('click', () => {
-  const muted = sound.toggleMuted();
-  updateSoundToggle();
-  if (!muted) {
-    sound.unlock();
-    sound.play('ui');
-  }
+pauseMenuButton.addEventListener('click', () => {
+  lastStage = -1;
+  stageBanner.hidden = true;
+  stageBanner.classList.remove('is-visible');
+  resetJoystick();
+  game.returnToMenu();
+});
+gameAudioToggle.addEventListener('click', () => {
+  const enabled = sound.toggleGameEnabled();
+  if (enabled) sound.unlock();
+  updateAudioSettings();
+  sound.play('ui');
+});
+effectsAudioToggle.addEventListener('click', () => {
+  const enabled = sound.toggleEffectsEnabled();
+  if (enabled) sound.unlock();
+  updateAudioSettings();
+  sound.play('ui');
+});
+gameVolume.addEventListener('input', () => {
+  sound.setGameVolume(Number(gameVolume.value) / 100);
+  updateAudioSettings();
+});
+effectsVolume.addEventListener('input', () => {
+  sound.setEffectsVolume(Number(effectsVolume.value) / 100);
+  updateAudioSettings();
 });
 element<HTMLButtonElement>('reload-button').addEventListener('click', () => window.location.reload());
 
@@ -364,7 +458,8 @@ installButton.addEventListener('click', async () => {
 const resizeObserver = new ResizeObserver(() => game.resize());
 resizeObserver.observe(canvas);
 game.resize();
-updateSoundToggle();
+renderLevelOptions();
+updateAudioSettings();
 setMode('ready');
 
 if (game.snapshot().qa) {
