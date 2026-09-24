@@ -418,6 +418,58 @@ body:not([data-mode="running"]) #joystick {
   transform: translate(-50%, 0);
 }
 
+#stage-banner {
+  position: absolute;
+  z-index: 17;
+  top: 20%;
+  left: 50%;
+  min-width: min(360px, calc(100vw - 40px));
+  padding: 14px 24px 16px;
+  transform: translate(-50%, -16px);
+  border-top: 1px solid var(--spark);
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, transparent, rgba(7, 20, 18, 0.82) 18%, rgba(7, 20, 18, 0.82) 82%, transparent);
+  color: var(--paper);
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease-out, transform 180ms ease-out;
+}
+
+#stage-banner.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+#stage-banner-kicker,
+#stage-banner-copy {
+  display: block;
+}
+
+#stage-banner-kicker {
+  color: var(--spark);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.2em;
+}
+
+#stage-banner strong {
+  display: block;
+  margin: 6px 0 4px;
+  color: var(--paper);
+  font-size: clamp(1.35rem, 4vw, 2.15rem);
+  line-height: 1;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+#stage-banner-copy {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -1006,6 +1058,12 @@ h1 span {
   .health-copy span,
   .time-readout span {
     display: none;
+  }
+
+  #stage-label {
+    display: block !important;
+    font-size: 0.5rem;
+    letter-spacing: 0.1em;
   }
 
   .health-copy,

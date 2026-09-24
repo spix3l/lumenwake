@@ -20,7 +20,7 @@ const SFX_FILES: Record<SoundName, string> = {
 
 const MUSIC_FILES: Record<MusicName, string> = {
   menu: '/assets/audio/forest-orchestra.ogg',
-  gameplay: '/assets/audio/forest-stage.ogg',
+  gameplay: '/assets/audio/garden-battle.mp3',
   ambient: '/assets/audio/forest-ambient.ogg',
 };
 
@@ -49,10 +49,10 @@ class SoundManager {
 
   setMuted(muted: boolean): void {
     this.muted = muted;
-    for (const track of this.music.values()) track.volume = muted ? 0 : 0.24;
+    for (const track of this.music.values()) track.volume = muted ? 0 : 0.12;
     for (const pool of this.effects.values()) {
       for (const track of pool) {
-        track.volume = muted ? 0 : 0.72;
+        track.volume = muted ? 0 : 0.42;
         if (muted) track.pause();
       }
     }
@@ -97,13 +97,13 @@ class SoundManager {
     if (!track) return;
     this.effectCursor.set(name, (index + 1) % pool.length);
     track.currentTime = 0;
-    track.volume = 0.72;
+    track.volume = 0.42;
     void track.play().catch(() => undefined);
   }
 
   private playMusic(name: MusicName): void {
     const track = this.getMusic(name);
-    track.volume = this.muted ? 0 : 0.24;
+    track.volume = this.muted ? 0 : 0.12;
     void track.play().catch(() => undefined);
   }
 
@@ -113,7 +113,7 @@ class SoundManager {
     const track = new Audio(MUSIC_FILES[name]);
     track.loop = true;
     track.preload = 'auto';
-    track.volume = this.muted ? 0 : 0.24;
+    track.volume = this.muted ? 0 : 0.12;
     this.music.set(name, track);
     return track;
   }
@@ -124,7 +124,7 @@ class SoundManager {
     const pool = Array.from({ length: SFX_POOL_SIZE }, () => {
       const track = new Audio(SFX_FILES[name]);
       track.preload = 'auto';
-      track.volume = this.muted ? 0 : 0.72;
+      track.volume = this.muted ? 0 : 0.42;
       return track;
     });
     this.effects.set(name, pool);

@@ -13,6 +13,9 @@ export interface HudState {
   elapsed: number;
   remaining: number;
   kills: number;
+  stage?: number;
+  stageName?: string;
+  stageDescription?: string;
 }
 
 export interface GameCallbacks {
@@ -145,6 +148,8 @@ export interface GameSnapshot {
   upgradeRanks: Record<string, number>;
   assetsReady: boolean;
   qa: boolean;
+  stage?: number;
+  stageName?: string;
 }
 
 const RUN_DURATION = 300;

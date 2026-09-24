@@ -12,6 +12,18 @@ interface Bridge {
 
 const START_CENTER = 770;
 const TAU = Math.PI * 2;
+const STAGE_DURATION = 60;
+const STAGES = [
+  { name: 'Rootway', description: 'The garden opens its eyes.' },
+  { name: 'Moonwell', description: 'The water remembers your name.' },
+  { name: 'Briarwind', description: 'The hedges begin to lean in.' },
+  { name: 'Hollow Crown', description: 'Something old wakes beneath the roots.' },
+  { name: 'Dawn Edge', description: 'Hold the light until sunrise.' },
+] as const;
+
+function stageAt(index: number) {
+  return STAGES[index] ?? STAGES[0]!;
+}
 
 type EnemyKind = 'gnaw' | 'shell';
 type EnemyState = 'pursue' | 'windup' | 'charge' | 'recover';
@@ -30,6 +42,7 @@ class ArenaScene extends Phaser.Scene {
   private inputY = 0;
   private keys = new Set<string>();
   private elapsed = 0;
+  private stage = 0;
   private level = 1;
   private xp = 0;
   private xpNeeded = experienceNeeded(1);
@@ -166,6 +179,8 @@ class ArenaScene extends Phaser.Scene {
     return {
       mode: this.mode,
       elapsed: this.elapsed,
+      stage: this.stage,
+      stageName: stageAt(this.stage).name,
       level: this.level,
       health: this.getHealth(),
       playerX: this.player?.x ?? START_CENTER,
@@ -202,6 +217,7 @@ class ArenaScene extends Phaser.Scene {
 
   private reset(): void {
     this.elapsed = 0;
+    this.stage = 0;
     this.level = 1;
     this.xp = 0;
     this.xpNeeded = experienceNeeded(1);
@@ -310,6 +326,7 @@ class ArenaScene extends Phaser.Scene {
       this.finish(true);
       return;
     }
+    this.updateStage();
     this.updatePlayer(delta);
     this.updateSpawning(delta);
     this.updateEnemies(delta);
@@ -349,12 +366,19 @@ class ArenaScene extends Phaser.Scene {
     this.player.setFlipX(Math.cos(this.facing) < -0.2);
   }
 
+  private updateStage(): void {
+    const nextStage = Math.min(STAGES.length - 1, Math.floor(this.elapsed / STAGE_DURATION));
+    if (nextStage === this.stage) return;
+    this.stage = nextStage;
+    this.callbacks.onToast(`${stageAt(this.stage).name} · ${stageAt(this.stage).description}`);
+    sound.play('upgrade');
+  }
+
   private updateSpawning(delta: number): void {
     if (this.elapsed >= this.nextSurge) {
       this.nextSurge += 60;
       const burst = this.qaMode ? 3 : Math.min(14, 7 + Math.floor(this.elapsed / 90));
       for (let index = 0; index < burst; index += 1) this.spawnEnemy();
-      this.callbacks.onToast(`Garden surge · minute ${Math.floor(this.nextSurge / 60)}`);
     }
     this.spawnTimer -= delta;
     const interval = this.qaMode ? 0.42 : Math.max(0.22, 0.72 - this.elapsed * 0.00125);
@@ -575,9 +599,10 @@ class ArenaScene extends Phaser.Scene {
   }
 
   private collectXp(drop: Phaser.Physics.Arcade.Image): void {
+    const value = Number(drop.getData('value')) || 1;
     drop.destroy();
     sound.play('xp');
-    this.xp += 1 * this.xpScale;
+    this.xp += value * this.xpScale;
     while (this.xp >= this.xpNeeded) {
       this.xp -= this.xpNeeded;
       this.level += 1;
@@ -593,6 +618,7 @@ class ArenaScene extends Phaser.Scene {
     drop.setData('age', Math.random() * TAU);
     const angle = Math.random() * TAU;
     const body = drop.body as Phaser.Physics.Arcade.Body;
+    body.setCircle(9);
     body.setVelocity(Math.cos(angle) * 38, Math.sin(angle) * 38);
   }
 
@@ -603,12 +629,18 @@ class ArenaScene extends Phaser.Scene {
       const dx = this.player.x - drop.x;
       const dy = this.player.y - drop.y;
       const distance = Math.max(0.001, Math.hypot(dx, dy));
-      if (distance < this.stats.pickupRadius) {
-        body.velocity.x += dx / distance * 460 * delta;
-        body.velocity.y += dy / distance * 460 * delta;
+      if (distance < 26) {
+        this.collectXp(drop);
+        continue;
       }
-      body.velocity.x *= Math.exp(-delta * (distance < this.stats.pickupRadius ? 1.8 : 5.2));
-      body.velocity.y *= Math.exp(-delta * (distance < this.stats.pickupRadius ? 1.8 : 5.2));
+      const magnetized = distance < this.stats.pickupRadius;
+      if (magnetized) {
+        body.velocity.x += dx / distance * 860 * delta;
+        body.velocity.y += dy / distance * 860 * delta;
+      }
+      const drag = Math.exp(-delta * (magnetized ? 2.2 : 5.2));
+      body.velocity.x *= drag;
+      body.velocity.y *= drag;
       drop.setRotation(drop.rotation + delta * 2);
     }
     if (this.pendingLevels > 0 && this.mode === 'running') this.openUpgrade();
@@ -699,6 +731,9 @@ class ArenaScene extends Phaser.Scene {
       elapsed: this.elapsed,
       remaining: Math.max(0, this.runDuration - this.elapsed),
       kills: this.kills,
+      stage: this.stage,
+      stageName: stageAt(this.stage).name,
+      stageDescription: stageAt(this.stage).description,
     };
   }
 

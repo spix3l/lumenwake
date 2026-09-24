@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lumenwake-shell-v10';
+const CACHE_NAME = 'lumenwake-shell-v12';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -41,7 +41,7 @@ const CORE_ASSETS = [
   './assets/game/building-well.png',
   './assets/game/building-shrine.png',
   './assets/audio/forest-orchestra.ogg',
-  './assets/audio/forest-stage.ogg',
+  './assets/audio/garden-battle.mp3',
   './assets/audio/forest-ambient.ogg',
   './assets/audio/effects/ui-click.ogg',
   './assets/audio/effects/start-bell.ogg',

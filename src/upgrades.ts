@@ -45,7 +45,7 @@ export const baseStats: Stats = {
   pulseRate: 2.7,
   pulseRange: 112,
   moveSpeed: 194,
-  pickupRadius: 76,
+  pickupRadius: 112,
   maxHealth: 100,
 };
 

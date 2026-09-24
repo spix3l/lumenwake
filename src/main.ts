@@ -45,6 +45,10 @@ const xpReadout = element<HTMLElement>('xp-readout');
 const joystick = element<HTMLElement>('joystick');
 const joystickKnob = element<HTMLElement>('joystick-knob');
 const toast = element<HTMLElement>('toast');
+const stageBanner = element<HTMLElement>('stage-banner');
+const stageBannerKicker = element<HTMLElement>('stage-banner-kicker');
+const stageBannerTitle = element<HTMLElement>('stage-banner-title');
+const stageBannerCopy = element<HTMLElement>('stage-banner-copy');
 const startButton = element<HTMLButtonElement>('start-button');
 const installButton = element<HTMLButtonElement>('install-button');
 const soundToggle = element<HTMLButtonElement>('sound-toggle');
@@ -61,6 +65,7 @@ const xpFill = element<HTMLElement>('xp-fill');
 const xpLabel = element<HTMLElement>('xp-label');
 const xpLevelText = element<HTMLElement>('xp-level-text');
 const timeText = element<HTMLElement>('time-text');
+const stageLabel = element<HTMLElement>('stage-label');
 const levelText = element<HTMLElement>('level-text');
 const pauseTime = element<HTMLElement>('pause-time');
 const pauseLevel = element<HTMLElement>('pause-level');
@@ -76,6 +81,8 @@ const endKills = element<HTMLElement>('end-kills');
 let currentMode: GameMode = 'ready';
 let currentChoices: Upgrade[] = [];
 let toastTimer = 0;
+let stageBannerTimer = 0;
+let lastStage = -1;
 let deferredInstall: BeforeInstallPromptEvent | null = null;
 let activePointer: number | null = null;
 let pointerOriginX = 0;
@@ -118,6 +125,8 @@ function updateHud(hudState: HudState): void {
   xpLevelText.textContent = `LV ${hudState.level}`;
   timeText.textContent = formatTime(hudState.remaining);
   levelText.textContent = String(hudState.level);
+  stageLabel.textContent = `STAGE ${(hudState.stage ?? 0) + 1}`;
+  showStageBanner(hudState);
   pauseTime.textContent = formatTime(hudState.elapsed);
   pauseLevel.textContent = String(hudState.level);
   pauseKills.textContent = String(hudState.kills);
@@ -134,6 +143,24 @@ function showToast(message: string): void {
       if (!toast.classList.contains('is-visible')) toast.hidden = true;
     }, 180);
   }, 1700);
+}
+
+function showStageBanner(hudState: HudState): void {
+  const stage = hudState.stage ?? 0;
+  if (stage === lastStage) return;
+  lastStage = stage;
+  stageBannerKicker.textContent = `STAGE ${String(stage + 1).padStart(2, '0')}`;
+  stageBannerTitle.textContent = hudState.stageName ?? 'Rootway';
+  stageBannerCopy.textContent = hudState.stageDescription ?? 'The garden opens its eyes.';
+  stageBanner.hidden = false;
+  requestAnimationFrame(() => stageBanner.classList.add('is-visible'));
+  window.clearTimeout(stageBannerTimer);
+  stageBannerTimer = window.setTimeout(() => {
+    stageBanner.classList.remove('is-visible');
+    window.setTimeout(() => {
+      if (!stageBanner.classList.contains('is-visible')) stageBanner.hidden = true;
+    }, 180);
+  }, 2300);
 }
 
 function updateSoundToggle(): void {
@@ -288,8 +315,14 @@ startButton.addEventListener('click', () => {
 });
 pauseButton.addEventListener('click', () => game.pause());
 resumeButton.addEventListener('click', () => game.resume());
-pauseRestartButton.addEventListener('click', () => game.restart());
-restartButton.addEventListener('click', () => game.restart());
+pauseRestartButton.addEventListener('click', () => {
+  lastStage = -1;
+  game.restart();
+});
+restartButton.addEventListener('click', () => {
+  lastStage = -1;
+  game.restart();
+});
 soundToggle.addEventListener('click', () => {
   const muted = sound.toggleMuted();
   updateSoundToggle();

@@ -25,8 +25,8 @@
           <div class="health-track"><span id="health-fill"></span></div>
         </section>
 
-        <section class="time-readout" aria-label="Time remaining">
-          <span id="dawn-label">DAWN IN</span>
+        <section class="time-readout" aria-label="Time remaining and stage">
+          <span id="stage-label">STAGE 1</span>
           <strong id="time-text">05:00</strong>
         </section>
 
@@ -50,6 +50,12 @@
       </div>
 
       <div id="toast" role="status" aria-live="polite" hidden></div>
+
+      <div id="stage-banner" role="status" aria-live="polite" hidden>
+        <span id="stage-banner-kicker">STAGE 01</span>
+        <strong id="stage-banner-title">Rootway</strong>
+        <small id="stage-banner-copy">The garden opens its eyes.</small>
+      </div>
 
       <section id="loading-screen" class="overlay is-visible" aria-label="Loading Lumenwake">
         <div class="loading-mark" aria-hidden="true"><span></span><span></span></div>
