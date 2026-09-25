@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lumenwake-shell-v13';
+const CACHE_NAME = 'lumenwake-shell-__BUILD_ID__';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -69,7 +69,7 @@ async function cacheAppShell() {
     const url = new URL(match[1], self.registration.scope).toString();
     if (url.startsWith(self.registration.scope) && !url.endsWith('/sw.js')) urls.add(url);
   }
-  await cache.addAll([...urls]);
+  await Promise.allSettled([...urls].map((url) => cache.add(url)));
 }
 
 self.addEventListener('install', (event) => {
@@ -87,18 +87,17 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || new URL(event.request.url).origin !== self.location.origin) return;
   event.respondWith(
-    caches.match(event.request, { ignoreVary: true }).then((cached) => {
+    fetch(event.request).then((response) => {
+      if (response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      }
+      return response;
+    }).catch(async () => {
+      const cached = await caches.match(event.request, { ignoreVary: true });
       if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        }
-        return response;
-      }).catch(() => {
-        if (event.request.mode === 'navigate') return caches.match('./', { ignoreVary: true });
-        return Response.error();
-      });
+      if (event.request.mode === 'navigate') return caches.match('./', { ignoreVary: true });
+      return Response.error();
     }),
   );
 });
