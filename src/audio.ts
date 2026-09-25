@@ -1,3 +1,5 @@
+import { assetUrl } from './paths';
+
 type SoundName = 'ui' | 'start' | 'pause' | 'resume' | 'walk' | 'shoot' | 'pulse' | 'hit' | 'hurt' | 'kill' | 'xp' | 'upgrade' | 'victory' | 'defeat';
 type MusicName = 'menu' | 'gameplay' | 'ambient';
 
@@ -9,26 +11,26 @@ export interface AudioSettings {
 }
 
 const SFX_FILES: Record<SoundName, string> = {
-  ui: '/assets/audio/effects/ui-click.ogg',
-  start: '/assets/audio/effects/start-bell.ogg',
-  pause: '/assets/audio/effects/pause-click.ogg',
-  resume: '/assets/audio/effects/resume-spring.ogg',
-  walk: '/assets/audio/effects/walk-step.ogg',
-  shoot: '/assets/audio/effects/shoot.ogg',
-  pulse: '/assets/audio/effects/pulse-spell.ogg',
-  hit: '/assets/audio/effects/hit.ogg',
-  hurt: '/assets/audio/effects/hurt.ogg',
-  kill: '/assets/audio/effects/kill.ogg',
-  xp: '/assets/audio/effects/xp-coin.ogg',
-  upgrade: '/assets/audio/effects/upgrade-gem.ogg',
-  victory: '/assets/audio/effects/victory-bell.ogg',
-  defeat: '/assets/audio/effects/defeat-impact.ogg',
+  ui: assetUrl('assets/audio/effects/ui-click.ogg'),
+  start: assetUrl('assets/audio/effects/start-bell.ogg'),
+  pause: assetUrl('assets/audio/effects/pause-click.ogg'),
+  resume: assetUrl('assets/audio/effects/resume-spring.ogg'),
+  walk: assetUrl('assets/audio/effects/walk-step.ogg'),
+  shoot: assetUrl('assets/audio/effects/shoot.ogg'),
+  pulse: assetUrl('assets/audio/effects/pulse-spell.ogg'),
+  hit: assetUrl('assets/audio/effects/hit.ogg'),
+  hurt: assetUrl('assets/audio/effects/hurt.ogg'),
+  kill: assetUrl('assets/audio/effects/kill.ogg'),
+  xp: assetUrl('assets/audio/effects/xp-coin.ogg'),
+  upgrade: assetUrl('assets/audio/effects/upgrade-gem.ogg'),
+  victory: assetUrl('assets/audio/effects/victory-bell.ogg'),
+  defeat: assetUrl('assets/audio/effects/defeat-impact.ogg'),
 };
 
 const MUSIC_FILES: Record<MusicName, string> = {
-  menu: '/assets/audio/forest-orchestra.ogg',
-  gameplay: '/assets/audio/garden-battle.mp3',
-  ambient: '/assets/audio/forest-ambient.ogg',
+  menu: assetUrl('assets/audio/forest-orchestra.ogg'),
+  gameplay: assetUrl('assets/audio/garden-battle.mp3'),
+  ambient: assetUrl('assets/audio/forest-ambient.ogg'),
 };
 
 const AUDIO_STORAGE_KEY = 'lumenwake-audio';

@@ -1,3 +1,5 @@
+import { assetUrl } from './paths';
+
 export const gameAssetNames = [
   'hero-0',
   'hero-1',
@@ -52,7 +54,7 @@ export class GameAssets {
         this.resolveOne();
       }, { once: true });
       image.addEventListener('error', () => this.resolveOne(), { once: true });
-      image.src = `/assets/game/${name}.png`;
+      image.src = assetUrl(`assets/game/${name}.png`);
     }
   }
 

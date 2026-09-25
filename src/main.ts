@@ -480,7 +480,7 @@ if (game.snapshot().qa) {
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(() => {
+    navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).then(() => {
       if (!deferredInstall) installStatus.textContent = 'Offline play is ready after this first visit.';
     }).catch(() => {
       installStatus.textContent = 'Offline mode is unavailable in this browser session.';
