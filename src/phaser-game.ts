@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { sound } from './audio';
 import { gameAssetNames } from './assets';
+import { assetUrl } from './paths';
 import { applyUpgrade, baseStats, experienceNeeded, getUpgrade, upgrades, type Stats, type UpgradeId } from './upgrades';
 import { perkDefinitions, type PerkKind } from './perks';
 import { DEFAULT_LEVEL_ID, getLevel, type LevelDefinition, type LevelId } from './levels';
@@ -80,7 +81,7 @@ class ArenaScene extends Phaser.Scene {
   }
 
   preload(): void {
-    for (const name of gameAssetNames) this.load.image(name, `/assets/game/${name}.png`);
+    for (const name of gameAssetNames) this.load.image(name, assetUrl(`assets/game/${name}.png`));
   }
 
   create(): void {
